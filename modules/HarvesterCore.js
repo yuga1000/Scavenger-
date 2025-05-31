@@ -342,8 +342,8 @@ class HarvesterCore {
         // Show automation status
         if (this.useRealExecution && this.taskExecutor) {
             this.logger.success('[✓] TaskExecutor: Real Automation ENABLED');
-            const capabilities = this.taskExecutor.getCapabilities();
-            this.logger.info(`[◉] Automation: ${capabilities.supportedCategories.length}/${capabilities.totalCategories} task types`);
+            const status = this.taskExecutor.getStatus();
+this.logger.info(`[◉] Automation: ${Object.keys(status.capabilities).filter(cap => status.capabilities[cap]).length} task types enabled`);
         } else {
             this.logger.info('[◎] TaskExecutor: Simulation mode only');
         }
@@ -364,7 +364,7 @@ class HarvesterCore {
                 .map(([name]) => name),
             scrapingEnabled: this.useScrapingFallback,
             realAutomation: this.useRealExecution,
-            automationCapabilities: this.taskExecutor ? this.taskExecutor.getCapabilities().supportedCategories : []
+            automationCapabilities: this.taskExecutor ? Object.keys(this.taskExecutor.getStatus().capabilities).filter(cap => this.taskExecutor.getStatus().capabilities[cap]) : []
         });
     }
 
