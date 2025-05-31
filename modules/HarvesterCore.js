@@ -4,6 +4,7 @@
 const https = require('https');
 const MicroworkersScraper = require('./MicroworkersScraper');
 const TaskExecutor = require('./TaskExecutor');
+const SmartTaskAnalyzer = require('./SmartTaskAnalyzer');
 
 class HarvesterCore {
     constructor(system) {
@@ -35,6 +36,9 @@ class HarvesterCore {
         // Task execution
         this.taskExecutor = null;
         this.useRealExecution = this.config.getBool('USE_REAL_EXECUTION', true);
+        
+        // Smart task analysis
+        this.smartAnalyzer = new SmartTaskAnalyzer(this.system);
         
         // Platform configurations with REAL endpoints
         this.platforms = {
@@ -491,6 +495,16 @@ class HarvesterCore {
                         task.isProduction = true;
                         task.securityValidated = true;
                         validTasks.push(task);
+                                        // Smart analysis and filtering
+                const analysis = this.smartAnalyzer.analyzeTask(task);
+                task.smartScore = analysis.totalScore;
+                task.recommendation = analysis.recommendation;
+                
+                // Keep only good tasks (score >= 60)
+                if (analysis.totalScore < 60) {
+                    this.logger.debug(`[--] Task skipped by AI: ${task.title} (score: ${analysis.totalScore})`);
+                    continue;
+                }
                     } else {
                         this.logger.warn(`[--] Task ${task.id} failed security validation`);
                         this.metrics.suspiciousActivities++;
@@ -504,7 +518,7 @@ class HarvesterCore {
                 this.logger.success(`[✓] ${platform.name}: ${validTasks.length} validated tasks loaded`);
                 
                 // Rate limiting between platform calls
-                await this.sleep(platform.rateLimitDelay);
+                this.taskQueue.sort((a, b) => b.smartScore - a.smartScore);
                 
             } catch (error) {
                 this.metrics.platformErrors[platformName] = (this.metrics.platformErrors[platformName] || 0) + 1;
@@ -882,6 +896,8 @@ class HarvesterCore {
         
         // Log successful completion
         await this.logger.logTaskCompletion(task.id, task.platform, task.reward, true);
+        // Learn from completed task
+        this.smartAnalyzer.learnFromTask(task, result);
     }
 
     async handleTaskFailure(task, error, duration) {
@@ -902,7 +918,8 @@ class HarvesterCore {
         });
         
         this.logger.error(`[✗] Task failed: ${task.title} - ${error}${task.scraped ? ' [SCRAPED]' : ''}`);
-        
+        // Learn from failed task  
+        this.smartAnalyzer.learnFromTask(task, { success: false, error: error });
         // Log failed completion
         await this.logger.logTaskCompletion(task.id, task.platform, task.reward, false);
     }
