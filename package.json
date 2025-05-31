@@ -1,32 +1,16 @@
 {
   "name": "ghostline-clean",
   "version": "4.1.0",
-  "description": "Ghostline Clean V4.1 - Enhanced Task Harvester with Web Scraping",
   "main": "main.js",
   "scripts": {
-    "start": "node main.js",
-    "dev": "node main.js",
-    "build": "echo 'Build complete'",
-    "postinstall": "node -e \"console.log('Ghostline Clean V4.1 dependencies installed')\""
+    "start": "node main.js"
   },
   "engines": {
     "node": ">=16.0.0"
   },
-"dependencies": {
+  "dependencies": {
     "node-telegram-bot-api": "^0.61.0",
     "puppeteer": "^21.6.1",
     "openai": "^4.26.0"
-}
-  "devDependencies": {},
-  "keywords": ["automation", "telegram", "scraping", "revenue"],
-  "author": "Ghostline Team",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/your-username/ghostline-clean.git"
-  },
-  "puppeteer": {
-    "skipChromiumDownload": false,
-    "executablePath": "/usr/bin/google-chrome-stable"
   }
 }
