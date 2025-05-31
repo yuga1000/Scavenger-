@@ -1,33 +1,32 @@
 {
+  "{
   "name": "ghostline-clean",
   "version": "4.1.0",
-  "description": "Ghostline Clean V4.1 - Multi-Platform Revenue Generation System with Real Web Scraping",
+  "description": "Ghostline Clean V4.1 - Enhanced Task Harvester with Web Scraping",
   "main": "main.js",
   "scripts": {
     "start": "node main.js",
-    "dev": "NODE_ENV=development node main.js",
-    "prod": "NODE_ENV=production node main.js",
-    "build": "npm install --production"
-  },
-  "keywords": [
-    "automation",
-    "revenue",
-    "microwork",
-    "telegram",
-    "scraping",
-    "puppeteer"
-  ],
-  "author": "Ghostline Team",
-  "license": "MIT",
-  "dependencies": {
-    "node-telegram-bot-api": "^0.64.0",
-    "puppeteer": "^21.6.1"
+    "dev": "node main.js",
+    "build": "echo 'Build complete'",
+    "postinstall": "node -e \"console.log('Ghostline Clean V4.1 dependencies installed')\""
   },
   "engines": {
     "node": ">=16.0.0"
   },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.61.0",
+    "puppeteer": "^21.6.1"
+  },
+  "devDependencies": {},
+  "keywords": ["automation", "telegram", "scraping", "revenue"],
+  "author": "Ghostline Team",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ghostline/clean-system.git"
+    "url": "https://github.com/your-username/ghostline-clean.git"
+  },
+  "puppeteer": {
+    "skipChromiumDownload": false,
+    "executablePath": "/usr/bin/google-chrome-stable"
   }
 }
