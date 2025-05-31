@@ -1,4 +1,4 @@
-// // TelegramInterface V4.1 Debug - Fixed Chat ID Issues
+// TelegramInterface V4.1 Final - Production Ready
 // File: modules/TelegramInterface.js
 
 const TelegramBot = require('node-telegram-bot-api');
@@ -15,7 +15,7 @@ class TelegramInterface {
         this.isConnected = false;
         this.isStarting = false;
         
-        this.logger.info('[◉] TelegramInterface V4.1 Debug initialized');
+        this.logger.info('[◉] TelegramInterface V4.1 Final initialized');
     }
 
     async initialize() {
@@ -33,11 +33,6 @@ class TelegramInterface {
         try {
             const botToken = this.config.get('TELEGRAM_BOT_TOKEN');
             this.chatId = this.config.get('TELEGRAM_CHAT_ID');
-            
-            // ✅ DEBUG: Log loaded values
-            this.logger.info(`[DEBUG] Loaded bot token: ${botToken ? 'YES' : 'NO'}`);
-            this.logger.info(`[DEBUG] Loaded chat ID: ${this.chatId}`);
-            this.logger.info(`[DEBUG] Chat ID type: ${typeof this.chatId}`);
             
             if (!botToken) {
                 throw new Error('TELEGRAM_BOT_TOKEN not configured');
@@ -191,17 +186,6 @@ class TelegramInterface {
         const chatId = msg.chat.id;
         const text = msg.text;
         
-        // ✅ DEBUG: Enhanced logging
-        this.logger.info(`[DEBUG] ==========================================`);
-        this.logger.info(`[DEBUG] Received message from chatId: ${chatId}`);
-        this.logger.info(`[DEBUG] Received message type: ${typeof chatId}`);
-        this.logger.info(`[DEBUG] Our stored chatId: ${this.chatId}`);
-        this.logger.info(`[DEBUG] Our stored chatId type: ${typeof this.chatId}`);
-        this.logger.info(`[DEBUG] Direct comparison: ${chatId === this.chatId}`);
-        this.logger.info(`[DEBUG] String comparison: ${chatId.toString() === this.chatId.toString()}`);
-        this.logger.info(`[DEBUG] Message text: ${text}`);
-        this.logger.info(`[DEBUG] ==========================================`);
-        
         // Store chat ID if not set
         if (!this.chatId) {
             this.chatId = chatId.toString();
@@ -209,15 +193,12 @@ class TelegramInterface {
             this.logger.info(`[✓] Chat ID automatically set to: ${this.chatId}`);
         }
         
-        // ✅ ВРЕМЕННО ОТКЛЮЧАЕМ SECURITY CHECK ДЛЯ ТЕСТИРОВАНИЯ
-        /*
         // Security check
         if (chatId.toString() !== this.chatId.toString()) {
             this.logger.warn(`[🚨] Unauthorized access attempt from chat: ${chatId}`);
             await this.bot.sendMessage(chatId, '🚫 Unauthorized access');
             return;
         }
-        */
         
         this.logger.info(`[📨] Processing message: ${text}`);
         
@@ -228,19 +209,14 @@ class TelegramInterface {
 
         try {
             if (text === '/start') {
-                this.logger.info('[▸] Handling /start command');
                 await this.handleStart(msg);
             } else if (text === '/status') {
-                this.logger.info('[▸] Handling /status command');
                 await this.handleStatus(msg);
             } else if (text === '/help') {
-                this.logger.info('[▸] Handling /help command');
                 await this.handleHelp(msg);
             } else if (text === '/menu') {
-                this.logger.info('[▸] Handling /menu command');
                 await this.handleMenu(msg);
             } else {
-                this.logger.info('[▸] Handling default message');
                 await this.sendMessageSafe(chatId, 
                     '🤖 Ghostline Clean V4.1 is running!\n\n' +
                     '📋 Available Commands:\n' +
@@ -303,8 +279,6 @@ class TelegramInterface {
     }
 
     async handleStart(msg) {
-        this.logger.info('[▸] Creating start menu...');
-        
         const keyboard = [
             [
                 { text: '📊 Status', callback_data: 'status' },
@@ -319,8 +293,6 @@ class TelegramInterface {
             ]
         ];
         
-        this.logger.info('[▸] Sending start menu...');
-        
         await this.sendMessageSafe(msg.chat.id,
             '🚀 <b>GHOSTLINE CLEAN V4.1</b>\n\n' +
             '💰 Clean Revenue Generation System\n\n' +
@@ -334,8 +306,6 @@ class TelegramInterface {
                 reply_markup: { inline_keyboard: keyboard }
             }
         );
-        
-        this.logger.info('[✓] Start menu sent successfully');
     }
 
     async handleControl(msg) {
@@ -526,15 +496,10 @@ class TelegramInterface {
     // Safe message sending with error handling
     async sendMessageSafe(chatId, text, options = {}) {
         try {
-            this.logger.info(`[▸] Attempting to send message to chat: ${chatId}`);
-            this.logger.info(`[▸] Message length: ${text.length} chars`);
-            
-            const result = await this.bot.sendMessage(chatId, text, options);
-            this.logger.success(`[✓] Message sent successfully to chat: ${chatId}`);
+            await this.bot.sendMessage(chatId, text, options);
             return true;
         } catch (error) {
-            this.logger.error(`[✗] Failed to send message to chat ${chatId}: ${error.message}`);
-            this.logger.error(`[✗] Error details: ${JSON.stringify(error)}`);
+            this.logger.error(`[✗] Failed to send message: ${error.message}`);
             return false;
         }
     }
