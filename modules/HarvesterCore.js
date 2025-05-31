@@ -601,7 +601,7 @@ class HarvesterCore {
             
             const endpoint = '/basic-campaigns';
             const headers = {
-                'MicroworkersApiKey': platform.config.apiKey,
+                'X-Microworkers-Api-Key': platform.config.apiKey,
                 'Content-Type': 'application/json',
                 'User-Agent': 'GhostlineClean/4.2.1'
             };
