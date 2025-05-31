@@ -12,10 +12,11 @@
   "engines": {
     "node": ">=16.0.0"
   },
-  "dependencies": {
+"dependencies": {
     "node-telegram-bot-api": "^0.61.0",
-    "puppeteer": "^21.6.1"
-  },
+    "puppeteer": "^21.6.1",
+    "openai": "^4.26.0"
+}
   "devDependencies": {},
   "keywords": ["automation", "telegram", "scraping", "revenue"],
   "author": "Ghostline Team",
