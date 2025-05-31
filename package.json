@@ -1,5 +1,4 @@
 {
-  "{
   "name": "ghostline-clean",
   "version": "4.1.0",
   "description": "Ghostline Clean V4.1 - Enhanced Task Harvester with Web Scraping",
@@ -8,7 +7,7 @@
     "start": "node main.js",
     "dev": "node main.js",
     "build": "echo 'Build complete'",
-    "postinstall": "node -e \"console.log('Ghostline Clean V4.1 dependencies installed')\"
+    "postinstall": "node -e \"console.log('Ghostline Clean V4.1 dependencies installed')\""
   },
   "engines": {
     "node": ">=16.0.0"
