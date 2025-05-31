@@ -1,17 +1,33 @@
 {
   "name": "ghostline-clean",
   "version": "4.1.0",
-  "description": "Ghostline Clean V4.1 - Multi-Platform Revenue Generation System",
+  "description": "Ghostline Clean V4.1 - Multi-Platform Revenue Generation System with Real Web Scraping",
   "main": "main.js",
   "scripts": {
     "start": "node main.js",
     "dev": "NODE_ENV=development node main.js",
-    "prod": "NODE_ENV=production node main.js"
+    "prod": "NODE_ENV=production node main.js",
+    "build": "npm install --production"
   },
+  "keywords": [
+    "automation",
+    "revenue",
+    "microwork",
+    "telegram",
+    "scraping",
+    "puppeteer"
+  ],
+  "author": "Ghostline Team",
+  "license": "MIT",
   "dependencies": {
-    "node-telegram-bot-api": "^0.64.0"
+    "node-telegram-bot-api": "^0.64.0",
+    "puppeteer": "^21.6.1"
   },
   "engines": {
     "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ghostline/clean-system.git"
   }
 }
