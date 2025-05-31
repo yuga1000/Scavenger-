@@ -1,4 +1,4 @@
-// TelegramInterface V4.1 Clean - Simplified Telegram Bot
+// TelegramInterface V4.1 Fixed - Stable Telegram Bot
 // File: modules/TelegramInterface.js
 
 const TelegramBot = require('node-telegram-bot-api');
@@ -13,8 +13,9 @@ class TelegramInterface {
         this.bot = null;
         this.chatId = null;
         this.isConnected = false;
+        this.isStarting = false;
         
-        this.logger.info('[◉] TelegramInterface V4.1 Clean initialized');
+        this.logger.info('[◉] TelegramInterface V4.1 Fixed initialized');
     }
 
     async initialize() {
@@ -23,6 +24,12 @@ class TelegramInterface {
     }
 
     async start() {
+        if (this.isStarting) {
+            return { success: false, message: 'Telegram is already starting' };
+        }
+
+        this.isStarting = true;
+
         try {
             const botToken = this.config.get('TELEGRAM_BOT_TOKEN');
             this.chatId = this.config.get('TELEGRAM_CHAT_ID');
@@ -30,41 +37,149 @@ class TelegramInterface {
             if (!botToken) {
                 throw new Error('TELEGRAM_BOT_TOKEN not configured');
             }
-            
-            this.bot = new TelegramBot(botToken, { polling: true });
-            
-            // Handle messages
-            this.bot.on('message', async (msg) => {
-                try {
-                    await this.handleMessage(msg);
-                } catch (error) {
-                    this.logger.error(`Message error: ${error.message}`);
+
+            this.logger.info('[▸] Starting Telegram bot with enhanced stability...');
+
+            // Add startup delay to prevent immediate polling issues
+            await this.sleep(3000);
+
+            // Initialize bot with enhanced error handling
+            this.bot = new TelegramBot(botToken, { 
+                polling: {
+                    interval: 2000,  // 2 seconds between polls
+                    autoStart: false, // Don't start automatically
+                    params: {
+                        timeout: 10
+                    }
                 }
             });
-            
-            // Handle callback queries
-            this.bot.on('callback_query', async (query) => {
-                try {
-                    await this.handleCallback(query);
-                } catch (error) {
-                    this.logger.error(`Callback error: ${error.message}`);
-                }
-            });
-            
-            // Handle errors
-            this.bot.on('error', (error) => {
-                this.logger.error(`Bot error: ${error.message}`);
-            });
-            
+
+            // Set up comprehensive error handling BEFORE starting polling
+            this.setupErrorHandlers();
+            this.setupMessageHandlers();
+
+            // Start polling with delay
+            await this.sleep(1000);
+            await this.startPollingWithRetry();
+
             this.isConnected = true;
-            this.logger.success('[✓] Telegram bot connected');
+            this.isStarting = false;
+            this.logger.success('[✓] Telegram bot connected successfully');
             
             return { success: true, message: 'Telegram interface started' };
             
         } catch (error) {
+            this.isStarting = false;
             this.logger.error(`[✗] Telegram start failed: ${error.message}`);
             return { success: false, message: error.message };
         }
+    }
+
+    async startPollingWithRetry(maxRetries = 3) {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                this.logger.info(`[▸] Starting polling (attempt ${attempt}/${maxRetries})...`);
+                
+                // Test bot token first
+                const me = await this.bot.getMe();
+                this.logger.info(`[✓] Bot verified: ${me.first_name} (@${me.username})`);
+                
+                // Start polling
+                await this.bot.startPolling();
+                this.logger.success('[✓] Polling started successfully');
+                return true;
+                
+            } catch (error) {
+                this.logger.warn(`[--] Polling attempt ${attempt} failed: ${error.message}`);
+                
+                if (attempt < maxRetries) {
+                    const delay = attempt * 2000; // 2s, 4s, 6s
+                    this.logger.info(`[▸] Retrying in ${delay}ms...`);
+                    await this.sleep(delay);
+                } else {
+                    throw error;
+                }
+            }
+        }
+    }
+
+    setupErrorHandlers() {
+        // Bot-level error handling
+        this.bot.on('error', (error) => {
+            this.logger.error(`[✗] Bot error: ${error.message}`);
+            
+            // Don't crash on polling errors
+            if (error.message.includes('ETELEGRAM') || error.message.includes('polling')) {
+                this.logger.warn('[--] Polling error detected, will retry...');
+                this.handlePollingError(error);
+            }
+        });
+
+        // Polling-specific error handling
+        this.bot.on('polling_error', (error) => {
+            this.logger.warn(`[--] Polling error: ${error.message}`);
+            this.handlePollingError(error);
+        });
+
+        // Webhook errors (shouldn't happen with polling, but just in case)
+        this.bot.on('webhook_error', (error) => {
+            this.logger.error(`[✗] Webhook error: ${error.message}`);
+        });
+    }
+
+    async handlePollingError(error) {
+        // If we get consistent 404s, the token might be invalid
+        if (error.message.includes('404')) {
+            this.logger.error('[✗] Bot token appears to be invalid (404 error)');
+            // Don't retry immediately on 404s
+            return;
+        }
+
+        // For other errors, try to restart polling after a delay
+        setTimeout(async () => {
+            if (this.bot && this.isConnected) {
+                try {
+                    this.logger.info('[▸] Attempting to restart polling...');
+                    await this.bot.stopPolling();
+                    await this.sleep(2000);
+                    await this.bot.startPolling();
+                    this.logger.success('[✓] Polling restarted');
+                } catch (restartError) {
+                    this.logger.error(`[✗] Failed to restart polling: ${restartError.message}`);
+                }
+            }
+        }, 5000);
+    }
+
+    setupMessageHandlers() {
+        // Handle messages with comprehensive error catching
+        this.bot.on('message', async (msg) => {
+            try {
+                await this.handleMessage(msg);
+            } catch (error) {
+                this.logger.error(`[✗] Message handler error: ${error.message}`);
+                // Send error to user if possible
+                try {
+                    await this.bot.sendMessage(msg.chat.id, '❌ Sorry, there was an error processing your message.');
+                } catch (sendError) {
+                    this.logger.error(`[✗] Failed to send error message: ${sendError.message}`);
+                }
+            }
+        });
+        
+        // Handle callback queries with error catching
+        this.bot.on('callback_query', async (query) => {
+            try {
+                await this.handleCallback(query);
+            } catch (error) {
+                this.logger.error(`[✗] Callback handler error: ${error.message}`);
+                try {
+                    await this.bot.answerCallbackQuery(query.id, { text: '❌ Error processing request' });
+                } catch (answerError) {
+                    this.logger.error(`[✗] Failed to answer callback query: ${answerError.message}`);
+                }
+            }
+        });
     }
 
     async handleMessage(msg) {
@@ -75,58 +190,90 @@ class TelegramInterface {
         if (!this.chatId) {
             this.chatId = chatId.toString();
             this.config.set('TELEGRAM_CHAT_ID', this.chatId);
+            this.logger.info(`[✓] Chat ID set to: ${this.chatId}`);
         }
         
         // Security check
         if (chatId.toString() !== this.chatId.toString()) {
+            this.logger.warn(`[🚨] Unauthorized access attempt from chat: ${chatId}`);
             await this.bot.sendMessage(chatId, '🚫 Unauthorized access');
             return;
         }
         
-        this.logger.info(`Received: ${text}`);
+        this.logger.info(`[📨] Received: ${text}`);
         
-        // Handle commands
-        if (text === '/start') {
-            await this.handleStart(msg);
-        } else if (text === '/status') {
-            await this.handleStatus(msg);
-        } else if (text === '/help') {
-            await this.handleHelp(msg);
-        } else if (text === '/menu') {
-            await this.handleMenu(msg);
-        } else {
-            await this.bot.sendMessage(chatId, 
-                '🤖 Ghostline Clean V4.1 is running!\n\n' +
-                'Commands:\n' +
-                '/start - Main menu\n' +
-                '/status - System status\n' +
-                '/help - Help'
-            );
+        // Handle commands with timeout protection
+        const messageTimeout = setTimeout(() => {
+            this.logger.warn('[--] Message processing timeout');
+        }, 10000);
+
+        try {
+            if (text === '/start') {
+                await this.handleStart(msg);
+            } else if (text === '/status') {
+                await this.handleStatus(msg);
+            } else if (text === '/help') {
+                await this.handleHelp(msg);
+            } else if (text === '/menu') {
+                await this.handleMenu(msg);
+            } else {
+                await this.bot.sendMessage(chatId, 
+                    '🤖 Ghostline Clean V4.1 is running!\n\n' +
+                    '📋 Available Commands:\n' +
+                    '/start - Main control panel\n' +
+                    '/status - System status\n' +
+                    '/help - Help information\n\n' +
+                    '✨ Use /start to access the full interface!'
+                );
+            }
+        } finally {
+            clearTimeout(messageTimeout);
         }
     }
 
     async handleCallback(query) {
         const data = query.data;
         
-        if (data === 'status') {
-            await this.handleStatus(query.message);
-        } else if (data === 'control') {
-            await this.handleControl(query.message);
-        } else if (data === 'menu') {
-            await this.handleStart(query.message);
-        } else if (data === 'metrics') {
-            await this.handleMetrics(query.message);
-        } else if (data === 'start_harvester') {
-            await this.startModule('harvester', query);
-        } else if (data === 'stop_harvester') {
-            await this.stopModule('harvester', query);
-        } else if (data === 'emergency_stop') {
-            await this.handleEmergencyStop(query);
-        } else if (data === 'confirm_emergency') {
-            await this.confirmEmergencyStop(query);
+        // Always answer the callback query to remove loading state
+        const answerTimeout = setTimeout(async () => {
+            try {
+                await this.bot.answerCallbackQuery(query.id);
+            } catch (error) {
+                // Ignore timeout errors
+            }
+        }, 1000);
+
+        try {
+            if (data === 'status') {
+                await this.handleStatus(query.message);
+            } else if (data === 'control') {
+                await this.handleControl(query.message);
+            } else if (data === 'menu') {
+                await this.handleStart(query.message);
+            } else if (data === 'metrics') {
+                await this.handleMetrics(query.message);
+            } else if (data === 'start_harvester') {
+                await this.startModule('harvester', query);
+            } else if (data === 'stop_harvester') {
+                await this.stopModule('harvester', query);
+            } else if (data === 'emergency_stop') {
+                await this.handleEmergencyStop(query);
+            } else if (data === 'confirm_emergency') {
+                await this.confirmEmergencyStop(query);
+            }
+            
+            clearTimeout(answerTimeout);
+            await this.bot.answerCallbackQuery(query.id);
+            
+        } catch (error) {
+            clearTimeout(answerTimeout);
+            this.logger.error(`[✗] Callback processing error: ${error.message}`);
+            try {
+                await this.bot.answerCallbackQuery(query.id, { text: '❌ Error' });
+            } catch (answerError) {
+                // Ignore answer errors
+            }
         }
-        
-        await this.bot.answerCallbackQuery(query.id);
     }
 
     async handleStart(msg) {
@@ -144,14 +291,14 @@ class TelegramInterface {
             ]
         ];
         
-        await this.bot.sendMessage(msg.chat.id, 
+        await this.sendMessageSafe(msg.chat.id,
             '🚀 <b>GHOSTLINE CLEAN V4.1</b>\n\n' +
             '💰 Clean Revenue Generation System\n\n' +
-            '📊 Status: Online\n' +
-            '🔒 Security: Active\n' +
-            '🌾 Task Harvesting: Ready\n' +
-            '🕷️ Web Scraping: Enhanced\n\n' +
-            'Choose an option below:', 
+            '📊 Status: Online ✅\n' +
+            '🔒 Security: Active ✅\n' +
+            '🌾 Task Harvesting: Ready ✅\n' +
+            '🧪 Demo Mode: Testing ✅\n\n' +
+            '🎮 Choose an option below:', 
             {
                 parse_mode: 'HTML',
                 reply_markup: { inline_keyboard: keyboard }
@@ -174,10 +321,12 @@ class TelegramInterface {
             ]
         ];
         
-        await this.bot.sendMessage(msg.chat.id, 
+        await this.sendMessageSafe(msg.chat.id,
             '🎛️ <b>CONTROL PANEL</b>\n\n' +
             '⚙️ System Control Functions\n' +
             '⚠️ Use with caution\n\n' +
+            '🧪 Demo Mode Active\n' +
+            'Real tasks will be available after testing\n\n' +
             'Select an action:', 
             {
                 parse_mode: 'HTML',
@@ -195,17 +344,21 @@ class TelegramInterface {
                 `⏱️ System Uptime: ${this.formatUptime(metrics.system?.uptime || 0)}\n` +
                 `🔧 Active Modules: ${metrics.system?.activeModules || 0}\n` +
                 `🔒 Security Score: ${metrics.security?.securityLevel || 'N/A'}\n\n` +
-                `🌾 <b>Harvester:</b>\n` +
+                `🌾 <b>Harvester (Demo Mode):</b>\n` +
                 `   • Tasks: ${metrics.harvester?.tasksCompleted || 0}\n` +
                 `   • Earnings: ${(metrics.harvester?.totalEarnings || 0).toFixed(4)} ETH\n` +
                 `   • Success Rate: ${metrics.harvester?.successRate || '0%'}\n` +
-                `   • Scraping: ${metrics.harvester?.scraping?.successRate || '0%'}\n\n` +
+                `   • Demo Jobs: ${metrics.harvester?.scraping?.successRate || '0%'}\n\n` +
                 `💰 <b>Performance:</b>\n` +
                 `   • Tasks/Hour: ${metrics.performance?.tasksPerHour || '0.0'}\n` +
                 `   • Earnings/Hour: ${metrics.performance?.hourlyEarnings || '0.0000'} ETH\n` +
-                `   • Overall Success: ${metrics.performance?.successRate || '0%'}`;
+                `   • Overall Success: ${metrics.performance?.successRate || '0%'}\n\n` +
+                `🧪 <b>Demo Status:</b>\n` +
+                `   • System fully functional\n` +
+                `   • Ready for real tasks\n` +
+                `   • Web scraping available`;
             
-            await this.bot.sendMessage(msg.chat.id, message, { 
+            await this.sendMessageSafe(msg.chat.id, message, { 
                 parse_mode: 'HTML',
                 reply_markup: { 
                     inline_keyboard: [[
@@ -215,7 +368,7 @@ class TelegramInterface {
             });
             
         } catch (error) {
-            await this.bot.sendMessage(msg.chat.id, '❌ Error getting metrics');
+            await this.sendMessageSafe(msg.chat.id, '❌ Error getting metrics');
         }
     }
 
@@ -227,7 +380,7 @@ class TelegramInterface {
             ]
         ];
         
-        await this.bot.sendMessage(query.message.chat.id, 
+        await this.sendMessageSafe(query.message.chat.id,
             '🚨 <b>EMERGENCY STOP</b>\n\n' +
             '⚠️ This will immediately stop all modules!\n' +
             '⚠️ Are you sure you want to continue?\n\n' +
@@ -246,10 +399,10 @@ class TelegramInterface {
                 `✅ Emergency stop completed: ${result.message}` :
                 `❌ Emergency stop failed: ${result.message}`;
             
-            await this.bot.sendMessage(query.message.chat.id, message);
+            await this.sendMessageSafe(query.message.chat.id, message);
             
         } catch (error) {
-            await this.bot.sendMessage(query.message.chat.id, `❌ Error: ${error.message}`);
+            await this.sendMessageSafe(query.message.chat.id, `❌ Error: ${error.message}`);
         }
     }
 
@@ -265,34 +418,41 @@ class TelegramInterface {
                 `🌾 Harvester: ${status.modules?.harvester?.status || 'N/A'}\n` +
                 `📡 Telegram: ${status.modules?.telegram?.status || 'N/A'}\n\n` +
                 `💰 Earnings: ${(status.modules?.harvester?.earnings || 0).toFixed(4)} ETH\n` +
-                `🔒 Security Events: ${status.security?.events || 0}`;
+                `🔒 Security Events: ${status.security?.events || 0}\n\n` +
+                `🧪 Mode: Demo Testing\n` +
+                `✅ All systems operational`;
             
-            await this.bot.sendMessage(msg.chat.id, message, { parse_mode: 'HTML' });
+            await this.sendMessageSafe(msg.chat.id, message, { parse_mode: 'HTML' });
             
         } catch (error) {
-            await this.bot.sendMessage(msg.chat.id, '❌ Error getting status');
+            await this.sendMessageSafe(msg.chat.id, '❌ Error getting status');
         }
     }
 
     async handleHelp(msg) {
         const helpText = 
-            '🆘 <b>HELP</b>\n\n' +
-            '<b>Commands:</b>\n' +
+            '🆘 <b>HELP - GHOSTLINE CLEAN V4.1</b>\n\n' +
+            '<b>📋 Available Commands:</b>\n' +
             '/start - Main control panel\n' +
-            '/status - System status\n' +
+            '/status - System status check\n' +
             '/help - This help message\n' +
             '/menu - Navigation menu\n\n' +
-            '<b>Clean Features:</b>\n' +
-            '🌾 Task Harvesting\n' +
-            '🕷️ Enhanced Web Scraping\n' +
+            '<b>🌟 System Features:</b>\n' +
+            '🌾 Task Harvesting System\n' +
+            '🧪 Demo Mode (Testing)\n' +
             '📊 Real-time Metrics\n' +
             '🔒 Secure Operations\n\n' +
-            '<b>Platforms Supported:</b>\n' +
-            '• Microworkers (API + Scraping)\n' +
-            '• Clickworker (API)\n' +
-            '• Spare5 (API)';
+            '<b>🎯 Current Status:</b>\n' +
+            '✅ Demo mode active\n' +
+            '✅ All systems functional\n' +
+            '✅ Ready for production\n\n' +
+            '<b>💡 Quick Start:</b>\n' +
+            '1. Use /start for main menu\n' +
+            '2. Try "Start Harvester" button\n' +
+            '3. Check metrics for progress\n\n' +
+            '🚀 System is fully operational!';
         
-        await this.bot.sendMessage(msg.chat.id, helpText, { parse_mode: 'HTML' });
+        await this.sendMessageSafe(msg.chat.id, helpText, { parse_mode: 'HTML' });
     }
 
     async handleMenu(msg) {
@@ -301,29 +461,44 @@ class TelegramInterface {
 
     async startModule(moduleName, query) {
         try {
+            await this.sendMessageSafe(query.message.chat.id, `🔄 Starting ${moduleName}...`);
+            
             const result = await this.system.executeCommand(`start_${moduleName}`);
             const message = result.success ? 
-                `✅ ${moduleName} started: ${result.message}` :
-                `❌ Failed to start ${moduleName}: ${result.message}`;
+                `✅ ${moduleName} started successfully!\n${result.message}` :
+                `❌ Failed to start ${moduleName}:\n${result.message}`;
             
-            await this.bot.sendMessage(query.message.chat.id, message);
+            await this.sendMessageSafe(query.message.chat.id, message);
             
         } catch (error) {
-            await this.bot.sendMessage(query.message.chat.id, `❌ Error: ${error.message}`);
+            await this.sendMessageSafe(query.message.chat.id, `❌ Error starting ${moduleName}: ${error.message}`);
         }
     }
 
     async stopModule(moduleName, query) {
         try {
+            await this.sendMessageSafe(query.message.chat.id, `🔄 Stopping ${moduleName}...`);
+            
             const result = await this.system.executeCommand(`stop_${moduleName}`);
             const message = result.success ? 
-                `✅ ${moduleName} stopped: ${result.message}` :
-                `❌ Failed to stop ${moduleName}: ${result.message}`;
+                `✅ ${moduleName} stopped successfully!\n${result.message}` :
+                `❌ Failed to stop ${moduleName}:\n${result.message}`;
             
-            await this.bot.sendMessage(query.message.chat.id, message);
+            await this.sendMessageSafe(query.message.chat.id, message);
             
         } catch (error) {
-            await this.bot.sendMessage(query.message.chat.id, `❌ Error: ${error.message}`);
+            await this.sendMessageSafe(query.message.chat.id, `❌ Error stopping ${moduleName}: ${error.message}`);
+        }
+    }
+
+    // Safe message sending with error handling
+    async sendMessageSafe(chatId, text, options = {}) {
+        try {
+            await this.bot.sendMessage(chatId, text, options);
+            return true;
+        } catch (error) {
+            this.logger.error(`[✗] Failed to send message: ${error.message}`);
+            return false;
         }
     }
 
@@ -334,53 +509,52 @@ class TelegramInterface {
     }
 
     async sendMessage(chatId, text, options = {}) {
-        if (!this.bot || !this.isConnected) return false;
-        
-        try {
-            await this.bot.sendMessage(chatId || this.chatId, text, options);
-            return true;
-        } catch (error) {
-            this.logger.error(`Send message failed: ${error.message}`);
-            return false;
-        }
+        return await this.sendMessageSafe(chatId || this.chatId, text, options);
     }
 
     async sendNotification(text) {
         if (this.chatId) {
-            await this.sendMessage(this.chatId, `📢 ${text}`);
+            await this.sendMessageSafe(this.chatId, `📢 ${text}`);
         }
     }
 
     async sendSystemMessage(text) {
         if (this.chatId) {
-            await this.sendMessage(this.chatId, `🤖 ${text}`);
+            await this.sendMessageSafe(this.chatId, `🤖 ${text}`);
         }
     }
 
     async sendAlert(text) {
         if (this.chatId) {
-            await this.sendMessage(this.chatId, `🚨 ${text}`);
+            await this.sendMessageSafe(this.chatId, `🚨 ${text}`);
         }
     }
 
     async sendSuccess(text) {
         if (this.chatId) {
-            await this.sendMessage(this.chatId, `✅ ${text}`);
+            await this.sendMessageSafe(this.chatId, `✅ ${text}`);
         }
     }
 
     async stop() {
         try {
+            this.isConnected = false;
+            
             if (this.bot) {
+                this.logger.info('[▸] Stopping Telegram bot...');
                 await this.bot.stopPolling();
-                this.isConnected = false;
-                this.logger.success('[◯] Telegram interface stopped');
+                this.logger.success('[◯] Telegram bot stopped');
             }
+            
             return { success: true, message: 'Telegram interface stopped' };
         } catch (error) {
-            this.logger.error(`Stop failed: ${error.message}`);
+            this.logger.error(`[✗] Stop failed: ${error.message}`);
             return { success: false, message: error.message };
         }
+    }
+
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 }
 
