@@ -190,7 +190,7 @@ class TaskFinderFix {
         ];
         
         const headers = {
-            'X-Microworkers-Api-Key': platform.config.apiKey,
+            'Authorization': `Bearer ${platform.config.apiKey}`,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'User-Agent': randomUA,
