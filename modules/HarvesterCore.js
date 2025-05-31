@@ -413,7 +413,7 @@ class HarvesterCore {
     async testMicroworkersAPI(platform) {
         const endpoint = '/accounts/me';
         const headers = {
-            'X-Microworkers-Api-Key': platform.config.apiKey,
+            'Authorization': `Bearer ${platform.config.apiKey}`,
             'Content-Type': 'application/json',
             'User-Agent': 'GhostlineClean/4.2.1'
         };
@@ -601,7 +601,7 @@ class HarvesterCore {
             
             const endpoint = '/basic-campaigns';
             const headers = {
-                'X-Microworkers-Api-Key': platform.config.apiKey,
+                'Authorization': `Bearer ${platform.config.apiKey}`,
                 'Content-Type': 'application/json',
                 'User-Agent': 'GhostlineClean/4.2.1'
             };
