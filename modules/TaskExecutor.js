@@ -768,7 +768,42 @@ I hope this contribution meets the specified requirements and provides the value
             const watchDuration = Math.min(watchTime, 300000); // Max 5 minutes
             
             this.logger.info(`[▸] Watching video for ${watchDuration/1000} seconds...`);
-            await this.humanDelay(watchDuration, watchDuration + 5000 await this.page.goto(url, { waitUntil: 'networkidle2' });
+            await this.humanDelay(watchDuration, watchDuration + 5000);
+            
+            // Take screenshot as proof
+            const screenshotPath = `youtube_${Date.now()}.png`;
+            await this.page.screenshot({ path: screenshotPath });
+            
+            return {
+                success: true,
+                action: 'youtube_watch',
+                url: url,
+                watchDuration: watchDuration, screenshot: screenshotPath,
+                details: `Watched YouTube video for ${watchDuration/1000} seconds`
+            };
+            
+        } catch (error) {
+            return {
+                success: false,
+                error: `Video task failed: ${error.message}`
+            };
+        }
+    }
+
+    // DATA ENTRY: Fill simple forms
+    async executeDataEntry(task) {
+        try {
+            this.logger.info('[▸] Executing data entry task...');
+            
+            const url = this.extractURL(task.title, task.description);
+            if (!url) {
+                return {
+                    success: false,
+                    error: 'No URL found for data entry task'
+                };
+            }
+            
+            await this.page.goto(url, { waitUntil: 'networkidle2' });
             await this.humanDelay(2000, 3000);
             
             // Find forms and inputs
@@ -1025,82 +1060,6 @@ I hope this contribution meets the specified requirements and provides the value
             userAgents: this.userAgents.length,
             randomDataSets: Object.keys(this.randomData).length
         };
-    }
-
-    // Добавляем недостающие данные в randomData
-    constructor(system) {
-        this.system = system;
-        this.logger = system.logger.create('TASK_EXECUTOR');
-        this.config = system.config;
-        
-        this.browser = null;
-        this.page = null;
-        
-        // Initialize OpenAI
-        this.openai = null;
-        if (process.env.OPENAI_API_KEY) {
-            this.openai = new OpenAI({
-                apiKey: process.env.OPENAI_API_KEY
-            });
-            this.logger.info('[🧠] GPT-4 integration enabled');
-        } else {
-            this.logger.warn('[--] OpenAI API key not found - writing tasks will use templates');
-        }
-        
-        // Execution capabilities (UPDATED with GPT-4)
-        this.capabilities = {
-            'search_tasks': true,           // Google search + screenshot
-            'website_review': true,         // Visit website + screenshot  
-            'social_content': true,         // Reddit comments, social posts
-            'data_entry': true,            // Fill simple forms
-            'survey': true,                // Simple surveys/questionnaires
-            'review_tasks': true,          // Write reviews (GPT-4 enhanced)
-            'content_review': true,        // Content writing (GPT-4)
-            'creative_tasks': this.openai ? true : false,  // GPT-4 required
-            'writing_tasks': this.openai ? true : false,   // GPT-4 required
-            'email_tasks': false,          // Gmail (need SMS verification)
-            'account_creation': false,     // Complex signups (need verification)
-            'video_tasks': true            // YouTube views (simple)
-        };
-        
-        // User agents for realistic browsing
-        this.userAgents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        ];
-        
-        // Random data for realistic execution (ДОПОЛНЕННЫЕ данные)
-        this.randomData = {
-            searchTerms: [
-                'best restaurants near me', 'weather forecast', 'news today',
-                'how to cook pasta', 'online shopping deals', 'movie reviews',
-                'travel destinations', 'fitness tips', 'healthy recipes'
-            ],
-            reviewTexts: [
-                'Great experience! Highly recommended.',
-                'Good quality service. Will use again.',
-                'Satisfied with the results. Professional work.',
-                'Nice product, fast delivery. Thanks!',
-                'Excellent customer support. Very helpful.',
-                'Quality product at reasonable price.',
-                'Easy to use and effective solution.'
-            ],
-            comments: [
-                'Thanks for sharing this information!',
-                'Very helpful post, appreciate it.',
-                'Interesting perspective on this topic.',
-                'Great advice, will definitely try this.',
-                'Thanks for the detailed explanation.',
-                'This is exactly what I was looking for.',
-                'Helpful tips, much appreciated!'
-            ],
-            names: ['John Smith', 'Sarah Johnson', 'Mike Williams', 'Emma Davis', 'Chris Wilson'],
-            cities: ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia'],
-            companies: ['TechCorp', 'GlobalSoft', 'InnovateLab', 'DataSys', 'CloudTech']
-        };
-        
-        this.logger.info('[◉] TaskExecutor V2.0 initialized - Real automation + GPT-4 ready');
     }
 }
 
