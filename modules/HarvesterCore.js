@@ -1,10 +1,11 @@
-// HarvesterCore V4.2 Complete - Enhanced Task Harvester with Real Task Execution
+// HarvesterCore V4.2.1 Complete - Enhanced Task Harvester with TaskFinderFix + Anti-Detection
 // File: modules/HarvesterCore.js
 
 const https = require('https');
 const MicroworkersScraper = require('./MicroworkersScraper');
 const TaskExecutor = require('./TaskExecutor');
 const SmartTaskAnalyzer = require('./SmartTaskAnalyzer');
+const TaskFinderFix = require('./TaskFinderFix'); // ✅ НОВЫЙ ИМПОРТ
 
 class HarvesterCore {
     constructor(system) {
@@ -13,7 +14,7 @@ class HarvesterCore {
         this.config = system.config;
         this.security = system.security;
         
-        this.version = '4.2.0';
+        this.version = '4.2.1'; // ✅ ОБНОВЛЕННАЯ ВЕРСИЯ
         this.isRunning = false;
         this.isInitialized = false;
         this.productionMode = false;
@@ -39,6 +40,9 @@ class HarvesterCore {
         
         // Smart task analysis
         this.smartAnalyzer = new SmartTaskAnalyzer(this.system);
+        
+        // ✅ НОВЫЙ TASK FINDER С АНТИПАЛЕВО
+        this.taskFinder = new TaskFinderFix(this.system);
         
         // Platform configurations with REAL endpoints
         this.platforms = {
@@ -112,6 +116,12 @@ class HarvesterCore {
             simulatedTasks: 0,
             automationSuccessRate: 0,
             
+            // ✅ НОВЫЕ АНТИПАЛЕВО МЕТРИКИ
+            antiDetectionEnabled: true,
+            requestsThisHour: 0,
+            breaksThisSession: 0,
+            adaptiveIntervalChanges: 0,
+            
             // Time metrics
             lastTaskTime: null,
             lastSuccessTime: null,
@@ -121,7 +131,7 @@ class HarvesterCore {
         // Configuration
         this.taskConfig = this.config.getTaskConfig();
         
-        this.logger.info('[◉] HarvesterCore V4.2 Complete initialized with Real Task Execution');
+        this.logger.info('[◉] HarvesterCore V4.2.1 с TaskFinderFix и антипалево защитой инициализирован');
     }
 
     async validateSecurityRequirements() {
@@ -259,7 +269,7 @@ class HarvesterCore {
 
     async initialize() {
         try {
-            this.logger.info('[▸] Initializing HarvesterCore V4.2 for REAL EXECUTION...');
+            this.logger.info('[▸] Initializing HarvesterCore V4.2.1 for REAL EXECUTION...');
             
             // Security validation
             await this.validateSecurityRequirements();
@@ -287,9 +297,9 @@ class HarvesterCore {
             await this.loadProductionTasks();
             
             this.isInitialized = true;
-            this.logger.success('[✓] HarvesterCore V4.2 REAL EXECUTION ready');
+            this.logger.success('[✓] HarvesterCore V4.2.1 REAL EXECUTION ready');
             
-            return { success: true, message: 'HarvesterCore V4.2 initialized for REAL EXECUTION' };
+            return { success: true, message: 'HarvesterCore V4.2.1 initialized for REAL EXECUTION' };
             
         } catch (error) {
             this.logger.error(`[✗] Initialization failed: ${error.message}`);
@@ -405,7 +415,7 @@ class HarvesterCore {
         const headers = {
             'MicroworkersApiKey': platform.config.apiKey,
             'Content-Type': 'application/json',
-            'User-Agent': 'GhostlineClean/4.2'
+            'User-Agent': 'GhostlineClean/4.2.1'
         };
         
         try {
@@ -551,17 +561,49 @@ class HarvesterCore {
         }
     }
 
+    // ✅ НОВЫЙ ИСПРАВЛЕННЫЙ МЕТОД ПОИСКА ЗАДАНИЙ
     async fetchMicroworkersTasks() {
         const platform = this.platforms.microworkers;
         
-        // First try API
+        this.logger.info('[🔍] Используем улучшенный поиск заданий с антипалево защитой...');
+        
         try {
-            this.logger.info('[▸] Trying Microworkers API...');
+            // ✅ СНАЧАЛА ПРОБУЕМ НОВЫЙ TaskFinderFix
+            const tasks = await this.taskFinder.findAvailableTasks();
+            
+            if (tasks && tasks.length > 0) {
+                this.logger.success(`[✓] TaskFinderFix нашел ${tasks.length} заданий`);
+                this.metrics.antiDetectionEnabled = true;
+                return tasks; // Уже нормализованы
+            }
+            
+            this.logger.info('[--] TaskFinderFix не нашел заданий, пробуем legacy методы...');
+            
+            // ✅ ФОЛЛБЕК НА LEGACY API + SCRAPING
+            return await this.fetchMicroworkersTasksLegacy();
+            
+        } catch (error) {
+            this.logger.error(`[✗] Ошибка в TaskFinderFix: ${error.message}`);
+            this.metrics.errors++;
+            
+            // ✅ ФОЛЛБЕК НА LEGACY ПРИ ОШИБКЕ
+            return await this.fetchMicroworkersTasksLegacy();
+        }
+    }
+
+    // ✅ LEGACY МЕТОД
+    async fetchMicroworkersTasksLegacy() {
+        const platform = this.platforms.microworkers;
+        
+        // Сначала пробуем оригинальный API
+        try {
+            this.logger.info('[▸] Пробуем legacy Microworkers API...');
             
             const endpoint = '/basic-campaigns';
             const headers = {
                 'MicroworkersApiKey': platform.config.apiKey,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'User-Agent': 'GhostlineClean/4.2.1'
             };
             
             const response = await this.makeHttpRequest('GET', platform.baseUrl + endpoint, null, headers);
@@ -571,27 +613,30 @@ class HarvesterCore {
                 const campaigns = data.items || [];
                 
                 if (campaigns.length > 0) {
-                    this.logger.success(`[✓] API returned ${campaigns.length} campaigns`);
+                    this.logger.success(`[✓] Legacy API вернул ${campaigns.length} кампаний`);
                     return campaigns.map(campaign => this.normalizeMicroworkersTask(campaign));
                 } else {
-                    this.logger.warn('[--] API returned empty list, trying enhanced scraping fallback...');
+                    this.logger.warn('[--] Legacy API вернул пустой список, пробуем скрейпинг...');
                 }
+            } else if (response.statusCode === 401) {
+                this.logger.warn('[--] Legacy API: недействительные credentials');
             } else {
-                this.logger.warn(`[--] API failed with ${response.statusCode}, trying enhanced scraping fallback...`);
+                this.logger.warn(`[--] Legacy API неудача: HTTP ${response.statusCode}`);
             }
         } catch (error) {
-            this.logger.warn(`[--] API error: ${error.message}, trying enhanced scraping fallback...`);
+            this.logger.warn(`[--] Legacy API ошибка: ${error.message}`);
+            this.metrics.platformErrors.microworkers = (this.metrics.platformErrors.microworkers || 0) + 1;
         }
         
-        // Fallback to enhanced scraping
+        // ✅ ФОЛЛБЕК НА ENHANCED SCRAPING
         if (this.useScrapingFallback && this.microworkersScraper) {
             try {
-                this.logger.info('[▸] Using enhanced web scraping fallback...');
+                this.logger.info('[🕷️] Используем enhanced web scraping fallback...');
                 this.metrics.scrapingAttempts++;
                 
-                // Check if scraper is healthy
+                // Проверяем здоровье скрейпера
                 if (!(await this.microworkersScraper.isHealthy())) {
-                    this.logger.info('[▸] Restarting scraper...');
+                    this.logger.info('[▸] Перезапуск нездорового скрейпера...');
                     await this.microworkersScraper.restart();
                 }
                 
@@ -599,20 +644,22 @@ class HarvesterCore {
                 
                 if (scrapedJobs.length > 0) {
                     this.metrics.scrapingSuccesses++;
-                    this.logger.success(`[✓] Enhanced scraping returned ${scrapedJobs.length} jobs`);
-                    return scrapedJobs; // Already normalized by scraper
+                    this.logger.success(`[✓] Enhanced scraping нашел ${scrapedJobs.length} заданий`);
+                    return scrapedJobs; // Уже нормализованы скрейпером
                 } else {
-                    this.logger.warn('[--] No jobs found via enhanced scraping');
+                    this.logger.warn('[--] Enhanced scraping не нашел заданий');
                 }
                 
             } catch (error) {
                 this.metrics.scrapingErrors++;
-                this.logger.error(`[✗] Enhanced scraping failed: ${error.message}`);
+                this.logger.error(`[✗] Enhanced scraping неудача: ${error.message}`);
             }
+        } else {
+            this.logger.warn('[--] Web scraping отключен или недоступен');
         }
         
-        // No jobs found
-        this.logger.warn('[--] No jobs available from API or enhanced scraping');
+        // ✅ НИЧЕГО НЕ НАЙДЕНО
+        this.logger.warn('[❌] Задания недоступны через все методы поиска');
         return [];
     }
 
@@ -743,7 +790,7 @@ class HarvesterCore {
         this.metrics.tasksInProgress++;
         this.metrics.lastTaskTime = new Date();
         
-        this.logger.info(`[▸] EXECUTING REAL TASK: ${task.title} (${task.platform})${task.scraped ? ' [SCRAPED]' : ''}`);
+        this.logger.info(`[▸] EXECUTING REAL TASK: ${task.title} (${task.platform})${task.scraped ? ' [SCRAPED]' : ''}${task.apiFound ? ' [API]' : ''}`);
         
         // Log task execution for audit
         await this.logger.logTransaction('task_started', {
@@ -753,6 +800,7 @@ class HarvesterCore {
             reward: task.reward,
             isProduction: true,
             scraped: task.scraped || false,
+            apiFound: task.apiFound || false,
             automatable: this.taskExecutor ? this.taskExecutor.canExecuteTask(task) : false
         });
         
@@ -774,7 +822,7 @@ class HarvesterCore {
     }
 
     async performRealTaskExecution(task) {
-        this.logger.info(`[◉] REAL TASK EXECUTION: ${task.id} on ${task.platform}${task.scraped ? ' [SCRAPED]' : ''}`);
+        this.logger.info(`[◉] REAL TASK EXECUTION: ${task.id} on ${task.platform}${task.scraped ? ' [SCRAPED]' : ''}${task.apiFound ? ' [API]' : ''}`);
         this.metrics.realTasksExecuted++;
         
         try {
@@ -807,6 +855,7 @@ class HarvesterCore {
                         automated: true,
                         realExecution: true,
                         scraped: task.scraped || false,
+                        apiFound: task.apiFound || false,
                         executionDetails: automationResult,
                         executionTime: automationResult.executionTime
                     };
@@ -829,6 +878,7 @@ class HarvesterCore {
                 taskId: task.id,
                 platform: task.platform,
                 scraped: task.scraped || false,
+                apiFound: task.apiFound || false,
                 automated: false
             };
         }
@@ -860,6 +910,7 @@ class HarvesterCore {
                 realExecution: false,
                 simulated: true,
                 scraped: task.scraped || false,
+                apiFound: task.apiFound || false,
                 executionTime: executionTime
             };
         } else {
@@ -894,7 +945,8 @@ class HarvesterCore {
         }
         
         const automationLabel = result.automated ? '[🤖 AUTOMATED]' : '[◎ SIMULATED]';
-        this.logger.success(`[✓] Task completed ${automationLabel}: ${task.title} - $${task.reward.toFixed(4)}${task.scraped ? ' [SCRAPED]' : ''}`);
+        const sourceLabel = task.apiFound ? '[API]' : (task.scraped ? '[SCRAPED]' : '');
+        this.logger.success(`[✓] Task completed ${automationLabel}${sourceLabel}: ${task.title} - $${task.reward.toFixed(4)}`);
         
         // Log successful completion
         await this.logger.logTaskCompletion(task.id, task.platform, task.reward, true);
@@ -919,7 +971,8 @@ class HarvesterCore {
             failedAt: new Date()
         });
         
-        this.logger.error(`[✗] Task failed: ${task.title} - ${error}${task.scraped ? ' [SCRAPED]' : ''}`);
+        const sourceLabel = task.apiFound ? '[API]' : (task.scraped ? '[SCRAPED]' : '');
+        this.logger.error(`[✗] Task failed${sourceLabel}: ${task.title} - ${error}`);
         // Learn from failed task  
         this.smartAnalyzer.learnFromTask(task, { success: false, error: error });
         // Log failed completion
@@ -936,6 +989,113 @@ class HarvesterCore {
             (successfulAutomated / recentAutomated.length * 100).toFixed(1) : 0;
     }
 
+    // ✅ ОБНОВЛЕННЫЙ executeMainLoop С АНТИПАЛЕВО
+    async executeMainLoop() {
+        this.logger.debug('[▸] Выполняем основной цикл harvester с антипалево проверками...');
+        this.metrics.taskCycles++;
+        
+        // ✅ АНТИПАЛЕВО ПРОВЕРКА ПЕРЕД ВЫПОЛНЕНИЕМ
+        if (this.taskFinder && !this.taskFinder.canMakeRequest()) {
+            const waitTime = this.taskFinder.getWaitTime();
+            const waitMinutes = Math.round(waitTime / 60000);
+            
+            this.logger.info(`[🛡️] Антипалево: пропускаем цикл, ждем ${waitMinutes} мин`);
+            this.metrics.breaksThisSession++;
+            
+            // Не делаем запросы, но можем обрабатывать существующие задания
+            if (this.taskQueue.length > 0) {
+                const task = this.taskQueue.shift();
+                await this.executeTask(task);
+            }
+            
+            return; // Пропускаем загрузку новых заданий
+        }
+        
+        // ✅ ОБРАБАТЫВАЕМ ЗАДАНИЯ В ОЧЕРЕДИ
+        if (this.taskQueue.length > 0) {
+            const task = this.taskQueue.shift();
+            await this.executeTask(task);
+        }
+        
+        // ✅ ОБНОВЛЯЕМ ОЧЕРЕДЬ ЕСЛИ НУЖНО (С УЧЕТОМ АНТИПАЛЕВО)
+        if (this.taskQueue.length < 5) {
+            try {
+                await this.loadProductionTasks();
+            } catch (error) {
+                this.logger.error(`[✗] Ошибка загрузки заданий: ${error.message}`);
+                this.metrics.errors++;
+            }
+        }
+        
+        // ✅ ОБНОВЛЯЕМ МЕТРИКИ АВТОМАТИЗАЦИИ
+        this.updateAutomationMetrics();
+        
+        // ✅ ОБНОВЛЯЕМ АНТИПАЛЕВО СТАТИСТИКУ
+        this.updateAntiDetectionMetrics();
+    }
+
+    // ✅ НОВЫЕ АНТИПАЛЕВО МЕТОДЫ
+    updateAntiDetectionMetrics() {
+        if (this.taskFinder) {
+            const stats = this.taskFinder.getAntiDetectionStats();
+            this.metrics.requestsThisHour = stats.requestsThisHour;
+            this.metrics.antiDetectionEnabled = stats.canMakeRequest;
+        }
+    }
+
+    getAdaptiveInterval() {
+        if (!this.taskFinder) {
+            return this.scanInterval; // Стандартный интервал если нет TaskFinder
+        }
+        
+        const antiDetection = this.taskFinder.getAntiDetectionStats();
+        
+        // Если нельзя делать запросы - увеличиваем интервал
+        if (!antiDetection.canMakeRequest) {
+            const adaptiveInterval = Math.max(this.scanInterval * 2, 300000); // Минимум 5 минут
+            this.logger.debug(`[⚙️] Адаптивный интервал (лимит): ${adaptiveInterval/1000}с`);
+            return adaptiveInterval;
+        }
+        
+        // Если близко к лимиту запросов - замедляемся
+        const usagePercent = antiDetection.requestsThisHour / antiDetection.maxRequestsPerHour;
+        if (usagePercent > 0.8) {
+            const adaptiveInterval = Math.round(this.scanInterval * 1.5); // Увеличиваем на 50%
+            this.logger.debug(`[⚙️] Адаптивный интервал (80% лимита): ${adaptiveInterval/1000}с`);
+            return adaptiveInterval;
+        }
+        
+        // Если близко к перерыву - тоже замедляемся
+        if (antiDetection.requestsUntilBreak <= 2) {
+            const adaptiveInterval = Math.round(this.scanInterval * 1.3); // Увеличиваем на 30%
+            this.logger.debug(`[⚙️] Адаптивный интервал (перед перерывом): ${adaptiveInterval/1000}с`);
+            return adaptiveInterval;
+        }
+        
+        // Стандартный интервал
+        return this.scanInterval;
+    }
+
+    getAntiDetectionMetrics() {
+        if (this.taskFinder) {
+            return this.taskFinder.getAntiDetectionStats();
+        }
+        return {
+            enabled: false,
+            message: 'TaskFinder не инициализирован'
+        };
+    }
+
+    updateAutomationMetrics() {
+        if (this.completedTasks.length > 0) {
+            const automatedCount = this.completedTasks.filter(task => 
+                task.result && task.result.automated === true).length;
+            const totalCompleted = this.completedTasks.length;
+            
+            this.metrics.automationRate = ((automatedCount / totalCompleted) * 100).toFixed(1);
+        }
+    }
+
     // HTTP request helper for REAL API calls
     async makeHttpRequest(method, url, data = null, headers = {}) {
         return new Promise((resolve, reject) => {
@@ -946,7 +1106,7 @@ class HarvesterCore {
                 path: urlObj.pathname + urlObj.search,
                 method: method,
                 headers: {
-                    'User-Agent': 'GhostlineClean/4.2',
+                    'User-Agent': 'GhostlineClean/4.2.1',
                     ...headers
                 }
             };
@@ -983,6 +1143,7 @@ class HarvesterCore {
         });
     }
 
+    // ✅ ОБНОВЛЕННЫЙ start МЕТОД С АДАПТИВНЫМ ИНТЕРВАЛОМ
     async start() {
         if (this.isRunning) {
             return { success: false, message: '[○] HarvesterCore is already running' };
@@ -999,9 +1160,10 @@ class HarvesterCore {
             this.isRunning = true;
             this.startTime = new Date();
             
-            this.logger.success('[◉] HarvesterCore V4.2 started in PRODUCTION MODE with Real Task Execution');
+            this.logger.success('[◉] HarvesterCore V4.2.1 запущен в PRODUCTION MODE с антипалево защитой');
             
-            // Log system start (FIXED - using getStatus())
+            // ✅ ЛОГИРУЕМ СТАРТ С АНТИПАЛЕВО ИНФОРМАЦИЕЙ
+            const antiDetectionStats = this.getAntiDetectionMetrics();
             await this.logger.logSecurity('harvester_started', {
                 mode: 'PRODUCTION',
                 version: this.version,
@@ -1009,22 +1171,19 @@ class HarvesterCore {
                 enabledPlatforms: Object.values(this.platforms).filter(p => p.enabled).length,
                 scrapingEnabled: this.useScrapingFallback,
                 realAutomation: this.useRealExecution,
+                antiDetectionEnabled: antiDetectionStats.enabled || true,
                 automationCapabilities: this.taskExecutor ? Object.keys(this.taskExecutor.getStatus().capabilities).filter(cap => this.taskExecutor.getStatus().capabilities[cap]) : []
             });
             
-            // Start main execution loop
+            // ✅ ЗАПУСКАЕМ ПЕРВЫЙ ЦИКЛ
             await this.executeMainLoop();
             
-            // Setup recurring execution
-            this.intervalId = setInterval(async () => {
-                if (this.isRunning) {
-                    await this.executeMainLoop();
-                }
-            }, this.scanInterval);
+            // ✅ НАСТРАИВАЕМ АДАПТИВНЫЙ RECURRING EXECUTION
+            this.setupAdaptiveExecution();
 
             return { 
                 success: true, 
-                message: '[◉] HarvesterCore V4.2 activated in PRODUCTION MODE with Real Task Execution'
+                message: '[◉] HarvesterCore V4.2.1 активирован с антипалево защитой'
             };
             
         } catch (error) {
@@ -1033,35 +1192,37 @@ class HarvesterCore {
         }
     }
 
-    async executeMainLoop() {
-        this.logger.debug('[▸] Executing main harvester loop...');
-        this.metrics.taskCycles++;
-        
-        // Process queued tasks
-        if (this.taskQueue.length > 0) {
-            const task = this.taskQueue.shift();
-            await this.executeTask(task);
-        }
-        
-        // Refresh task queue if needed
-        if (this.taskQueue.length < 5) {
-            await this.loadProductionTasks();
-        }
-        
-        // Update automation metrics
-        this.updateAutomationMetrics();
-    }
-
-    updateAutomationMetrics() {
-        if (this.completedTasks.length > 0) {
-            const automatedCount = this.completedTasks.filter(task => 
-                task.result && task.result.automated === true).length;
-            const totalCompleted = this.completedTasks.length;
+    // ✅ НАСТРОЙКА АДАПТИВНОГО ВЫПОЛНЕНИЯ
+    setupAdaptiveExecution() {
+        const executeWithAdaptiveInterval = async () => {
+            if (!this.isRunning) return;
             
-            this.metrics.automationRate = ((automatedCount / totalCompleted) * 100).toFixed(1);
-        }
+            // Выполняем основной цикл
+            await this.executeMainLoop();
+            
+            // ✅ ВЫЧИСЛЯЕМ АДАПТИВНЫЙ ИНТЕРВАЛ
+            const currentInterval = this.scanInterval;
+            const adaptiveInterval = this.getAdaptiveInterval();
+            
+            // Логируем изменения интервала
+            if (adaptiveInterval !== currentInterval) {
+                this.logger.info(`[⚙️] Адаптивный интервал: ${currentInterval/1000}с → ${adaptiveInterval/1000}с`);
+                this.metrics.adaptiveIntervalChanges++;
+            }
+            
+            // ✅ ПЛАНИРУЕМ СЛЕДУЮЩЕЕ ВЫПОЛНЕНИЕ
+            if (this.isRunning) {
+                this.intervalId = setTimeout(executeWithAdaptiveInterval, adaptiveInterval);
+            }
+        };
+        
+        // Запускаем адаптивное выполнение
+        this.intervalId = setTimeout(executeWithAdaptiveInterval, this.scanInterval);
+        
+        this.logger.info(`[⚙️] Адаптивное выполнение настроено с базовым интервалом ${this.scanInterval/1000}с`);
     }
 
+    // ✅ ОБНОВЛЕННЫЙ stop МЕТОД
     async stop() {
         if (!this.isRunning) {
             return { success: false, message: '[○] HarvesterCore is not running' };
@@ -1070,27 +1231,33 @@ class HarvesterCore {
         try {
             this.isRunning = false;
             
+            // ✅ ОЧИЩАЕМ АДАПТИВНЫЙ ТАЙМЕР
             if (this.intervalId) {
-                clearInterval(this.intervalId);
+                clearTimeout(this.intervalId); // Изменено с clearInterval на clearTimeout
                 this.intervalId = null;
+                this.logger.info('[✓] Адаптивный таймер остановлен');
             }
             
-            // Close task executor
+            // Закрываем task executor
             if (this.taskExecutor) {
-                this.logger.info('[▸] Closing TaskExecutor...');
+                this.logger.info('[▸] Закрываем TaskExecutor...');
                 await this.taskExecutor.close();
-                this.logger.success('[✓] TaskExecutor closed');
+                this.logger.success('[✓] TaskExecutor закрыт');
             }
             
-            // Close scraper
+            // Закрываем scraper
             if (this.microworkersScraper) {
-                this.logger.info('[▸] Closing enhanced web scraper...');
+                this.logger.info('[▸] Закрываем enhanced web scraper...');
                 await this.microworkersScraper.close();
-                this.logger.success('[✓] Enhanced web scraper closed');
+                this.logger.success('[✓] Enhanced web scraper закрыт');
             }
             
-            this.logger.success('[◯] HarvesterCore V4.2 stopped gracefully');
-            return { success: true, message: '[◯] HarvesterCore V4.2 stopped successfully' };
+            // ✅ ФИНАЛЬНАЯ СТАТИСТИКА АНТИПАЛЕВО
+            const finalStats = this.getAntiDetectionMetrics();
+            this.logger.info(`[📊] Финальная статистика антипалево: запросов ${finalStats.requestsThisHour || 0}, перерывов ${this.metrics.breaksThisSession}, изменений интервала ${this.metrics.adaptiveIntervalChanges}`);
+            
+            this.logger.success('[◯] HarvesterCore V4.2.1 остановлен корректно');
+            return { success: true, message: '[◯] HarvesterCore V4.2.1 остановлен успешно' };
             
         } catch (error) {
             this.logger.error(`[✗] Stop failed: ${error.message}`);
@@ -1125,22 +1292,27 @@ class HarvesterCore {
         return total > 0 ? `${(automated / total * 100).toFixed(1)}%` : '0%';
     }
     
+    // ✅ ОБНОВЛЕННЫЙ getDetailedMetrics С АНТИПАЛЕВО
     getDetailedMetrics() {
-        return {
+        const baseMetrics = {
             ...this.metrics,
             successRate: this.getSuccessRate(),
             scrapingSuccessRate: this.metrics.scrapingAttempts > 0 ? 
                 `${(this.metrics.scrapingSuccesses / this.metrics.scrapingAttempts * 100).toFixed(1)}%` : '0%',
+            
             platforms: Object.fromEntries(
                 Object.entries(this.platforms).map(([name, platform]) => [
                     name, 
                     {
                         enabled: platform.enabled,
                         taskCount: platform.taskCount,
-                        successRate: platform.successRate
+                        successRate: platform.successRate,
+                        lastCheck: platform.lastCheck,
+                        rateLimitDelay: platform.rateLimitDelay
                     }
                 ])
             ),
+            
             scraping: {
                 enabled: this.useScrapingFallback,
                 attempts: this.metrics.scrapingAttempts,
@@ -1149,6 +1321,7 @@ class HarvesterCore {
                 successRate: this.metrics.scrapingAttempts > 0 ? 
                     `${(this.metrics.scrapingSuccesses / this.metrics.scrapingAttempts * 100).toFixed(1)}%` : '0%'
             },
+            
             automation: {
                 enabled: this.useRealExecution,
                 capabilities: this.taskExecutor ? this.taskExecutor.getStatus() : null,
@@ -1158,13 +1331,59 @@ class HarvesterCore {
                 automationSuccessRate: this.metrics.automationSuccessRate + '%',
                 totalAutomationAttempts: this.metrics.automatedTasks + this.metrics.simulatedTasks
             },
+            
+            // ✅ НОВЫЕ АНТИПАЛЕВО МЕТРИКИ
+            antiDetection: this.getAntiDetectionMetrics(),
+            
+            // ✅ РАСШИРЕННЫЕ АНТИПАЛЕВО ДАННЫЕ
+            antiDetectionDetails: {
+                enabled: this.metrics.antiDetectionEnabled,
+                requestsThisHour: this.metrics.requestsThisHour,
+                breaksThisSession: this.metrics.breaksThisSession,
+                adaptiveIntervalChanges: this.metrics.adaptiveIntervalChanges,
+                currentInterval: this.scanInterval,
+                adaptiveInterval: this.getAdaptiveInterval(),
+                intervalMultiplier: (this.getAdaptiveInterval() / this.scanInterval).toFixed(2) + 'x'
+            },
+            
             performance: {
                 tasksPerHour: this.calculateTasksPerHour(),
                 earningsPerHour: this.calculateEarningsPerHour(),
                 avgTaskDuration: this.calculateAvgTaskDuration(),
-                avgAutomationTime: this.calculateAvgAutomationTime()
+                avgAutomationTime: this.calculateAvgAutomationTime(),
+                // ✅ НОВЫЕ ПРОИЗВОДИТЕЛЬНЫЕ МЕТРИКИ
+                cyclesPerHour: this.calculateCyclesPerHour(),
+                errorsPerHour: this.calculateErrorsPerHour(),
+                uptime: this.calculateUptime()
             }
         };
+        
+        return baseMetrics;
+    }
+
+    // ✅ НОВЫЕ ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
+    calculateCyclesPerHour() {
+        if (!this.startTime) return '0.0';
+        const hoursRunning = (Date.now() - this.startTime.getTime()) / 3600000;
+        return hoursRunning > 0 ? (this.metrics.taskCycles / hoursRunning).toFixed(1) : '0.0';
+    }
+
+    calculateErrorsPerHour() {
+        if (!this.startTime) return '0.0';
+        const hoursRunning = (Date.now() - this.startTime.getTime()) / 3600000;
+        return hoursRunning > 0 ? (this.metrics.errors / hoursRunning).toFixed(1) : '0.0';
+    }
+
+    calculateUptime() {
+        if (!this.startTime) return '0m';
+        const uptimeMs = Date.now() - this.startTime.getTime();
+        const hours = Math.floor(uptimeMs / 3600000);
+        const minutes = Math.floor((uptimeMs % 3600000) / 60000);
+        
+        if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        }
+        return `${minutes}m`;
     }
 
     calculateTasksPerHour() {
@@ -1196,13 +1415,14 @@ class HarvesterCore {
         return Math.round(totalTime / automatedTasks.length);
     }
 
-    // Health check for monitoring (FIXED - using getStatus())
+    // Health check for monitoring
     healthCheck() {
         return {
             status: this.isRunning ? 'running' : (this.isInitialized ? 'ready' : 'initializing'),
             version: this.version,
             uptime: this.startTime ? Date.now() - this.startTime.getTime() : 0,
             security: this.security.getHealthStatus(),
+            antiDetection: this.getAntiDetectionMetrics(),
             automation: {
                 enabled: this.useRealExecution,
                 executor_healthy: this.taskExecutor ? true : false,
@@ -1217,7 +1437,10 @@ class HarvesterCore {
                 tasks_completed: this.metrics.tasksCompleted,
                 tasks_automated: this.getAutomatedTaskCount(),
                 success_rate: this.getSuccessRate(),
-                total_earnings: this.metrics.totalEarnings
+                total_earnings: this.metrics.totalEarnings,
+                anti_detection_active: this.metrics.antiDetectionEnabled,
+                requests_this_hour: this.metrics.requestsThisHour,
+                breaks_this_session: this.metrics.breaksThisSession
             },
             timestamp: new Date().toISOString()
         };
