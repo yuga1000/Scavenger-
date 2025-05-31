@@ -343,7 +343,7 @@ class HarvesterCore {
         if (this.useRealExecution && this.taskExecutor) {
             this.logger.success('[✓] TaskExecutor: Real Automation ENABLED');
             const status = this.taskExecutor.getStatus();
-this.logger.info(`[◉] Automation: ${Object.keys(status.capabilities).filter(cap => status.capabilities[cap]).length} task types enabled`);
+            this.logger.info(`[◉] Automation: ${Object.keys(status.capabilities).filter(cap => status.capabilities[cap]).length} task types enabled`);
         } else {
             this.logger.info('[◎] TaskExecutor: Simulation mode only');
         }
@@ -494,17 +494,19 @@ this.logger.info(`[◉] Automation: ${Object.keys(status.capabilities).filter(ca
                         task.platform = platformName;
                         task.isProduction = true;
                         task.securityValidated = true;
+                        
+                        // Smart analysis and filtering
+                        const analysis = this.smartAnalyzer.analyzeTask(task);
+                        task.smartScore = analysis.totalScore;
+                        task.recommendation = analysis.recommendation;
+                        
+                        // Keep only good tasks (score >= 60)
+                        if (analysis.totalScore < 60) {
+                            this.logger.debug(`[--] Task skipped by AI: ${task.title} (score: ${analysis.totalScore})`);
+                            continue;
+                        }
+                        
                         validTasks.push(task);
-                                        // Smart analysis and filtering
-                const analysis = this.smartAnalyzer.analyzeTask(task);
-                task.smartScore = analysis.totalScore;
-                task.recommendation = analysis.recommendation;
-                
-                // Keep only good tasks (score >= 60)
-                if (analysis.totalScore < 60) {
-                    this.logger.debug(`[--] Task skipped by AI: ${task.title} (score: ${analysis.totalScore})`);
-                    continue;
-                }
                     } else {
                         this.logger.warn(`[--] Task ${task.id} failed security validation`);
                         this.metrics.suspiciousActivities++;
@@ -999,7 +1001,7 @@ this.logger.info(`[◉] Automation: ${Object.keys(status.capabilities).filter(ca
             
             this.logger.success('[◉] HarvesterCore V4.2 started in PRODUCTION MODE with Real Task Execution');
             
-            // Log system start
+            // Log system start (FIXED - using getStatus())
             await this.logger.logSecurity('harvester_started', {
                 mode: 'PRODUCTION',
                 version: this.version,
@@ -1007,7 +1009,7 @@ this.logger.info(`[◉] Automation: ${Object.keys(status.capabilities).filter(ca
                 enabledPlatforms: Object.values(this.platforms).filter(p => p.enabled).length,
                 scrapingEnabled: this.useScrapingFallback,
                 realAutomation: this.useRealExecution,
-                automationCapabilities: this.taskExecutor ? this.taskExecutor.getCapabilities().supportedCategories : []
+                automationCapabilities: this.taskExecutor ? Object.keys(this.taskExecutor.getStatus().capabilities).filter(cap => this.taskExecutor.getStatus().capabilities[cap]) : []
             });
             
             // Start main execution loop
@@ -1149,7 +1151,7 @@ this.logger.info(`[◉] Automation: ${Object.keys(status.capabilities).filter(ca
             },
             automation: {
                 enabled: this.useRealExecution,
-                capabilities: this.taskExecutor ? this.taskExecutor.getCapabilities() : null,
+                capabilities: this.taskExecutor ? this.taskExecutor.getStatus() : null,
                 automatedTasks: this.getAutomatedTaskCount(),
                 simulatedTasks: this.getSimulatedTaskCount(),
                 automationRate: this.getAutomationRate(),
@@ -1194,7 +1196,7 @@ this.logger.info(`[◉] Automation: ${Object.keys(status.capabilities).filter(ca
         return Math.round(totalTime / automatedTasks.length);
     }
 
-    // Health check for monitoring
+    // Health check for monitoring (FIXED - using getStatus())
     healthCheck() {
         return {
             status: this.isRunning ? 'running' : (this.isInitialized ? 'ready' : 'initializing'),
@@ -1204,7 +1206,7 @@ this.logger.info(`[◉] Automation: ${Object.keys(status.capabilities).filter(ca
             automation: {
                 enabled: this.useRealExecution,
                 executor_healthy: this.taskExecutor ? true : false,
-                capabilities: this.taskExecutor ? this.taskExecutor.getCapabilities().supportedCategories.length : 0
+                capabilities: this.taskExecutor ? Object.keys(this.taskExecutor.getStatus().capabilities).filter(cap => this.taskExecutor.getStatus().capabilities[cap]).length : 0
             },
             modules: Object.keys(this.platforms).map(name => ({
                 name,
