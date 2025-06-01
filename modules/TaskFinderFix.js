@@ -744,7 +744,7 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
         this.intelligence.sourceHealth.set(sourceName, health);
     }
     
-    update MarketIntelligence(tasks) {
+    updateMarketIntelligence(tasks) {
         // Update market trends and timing patterns
         const hour = new Date().getHours();
         const day = new Date().getDay();
