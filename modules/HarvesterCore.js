@@ -1,11 +1,11 @@
-// HarvesterCore V4.2.1 Complete - Enhanced Task Harvester with TaskFinderFix + Anti-Detection
+// HarvesterCore V4.2.1 Complete - Enhanced Task Harvester with TaskFinderFix + Debug
 // File: modules/HarvesterCore.js
 
 const https = require('https');
 const MicroworkersScraper = require('./MicroworkersScraper');
 const TaskExecutor = require('./TaskExecutor');
 const SmartTaskAnalyzer = require('./SmartTaskAnalyzer');
-const TaskFinderFix = require('./TaskFinderFix'); // ✅ НОВЫЙ ИМПОРТ
+const TaskFinderFix = require('./TaskFinderFix');
 
 class HarvesterCore {
     constructor(system) {
@@ -14,7 +14,7 @@ class HarvesterCore {
         this.config = system.config;
         this.security = system.security;
         
-        this.version = '4.2.1'; // ✅ ОБНОВЛЕННАЯ ВЕРСИЯ
+        this.version = '4.2.1';
         this.isRunning = false;
         this.isInitialized = false;
         this.productionMode = false;
@@ -41,10 +41,10 @@ class HarvesterCore {
         // Smart task analysis
         this.smartAnalyzer = new SmartTaskAnalyzer(this.system);
         
-        // ✅ НОВЫЙ TASK FINDER С АНТИПАЛЕВО
+        // TaskFinder with Anti-Detection
         this.taskFinder = new TaskFinderFix(this.system);
         
-        // Platform configurations with REAL endpoints
+        // Platform configurations
         this.platforms = {
             microworkers: {
                 name: 'Microworkers',
@@ -80,64 +80,44 @@ class HarvesterCore {
         
         // Performance metrics
         this.metrics = {
-            // Task metrics
             tasksCompleted: 0,
             tasksSuccessful: 0,
             tasksFailed: 0,
             tasksInProgress: 0,
-            
-            // Earnings metrics
             totalEarnings: 0,
             pendingEarnings: 0,
             lastPayout: null,
-            
-            // Performance metrics
             taskCycles: 0,
             apiCalls: 0,
             errors: 0,
             avgTaskDuration: 0,
             avgTaskReward: 0,
-            
-            // Platform metrics
             realTasksExecuted: 0,
             platformErrors: {},
-            
-            // Security metrics
             securityChecks: 0,
             suspiciousActivities: 0,
-            
-            // Scraping metrics
             scrapingAttempts: 0,
             scrapingSuccesses: 0,
             scrapingErrors: 0,
-            
-            // Automation metrics
             automatedTasks: 0,
             simulatedTasks: 0,
             automationSuccessRate: 0,
-            
-            // ✅ НОВЫЕ АНТИПАЛЕВО МЕТРИКИ
             antiDetectionEnabled: true,
             requestsThisHour: 0,
             breaksThisSession: 0,
             adaptiveIntervalChanges: 0,
-            
-            // Time metrics
             lastTaskTime: null,
             lastSuccessTime: null,
             lastErrorTime: null
         };
         
-        // Configuration
         this.taskConfig = this.config.getTaskConfig();
-        
-        this.logger.info('[◉] HarvesterCore V4.2.1 с TaskFinderFix и антипалево защитой инициализирован');
+        this.logger.info('[◉] HarvesterCore V4.2.1 с детальной отладкой API инициализирован');
     }
 
     async validateSecurityRequirements() {
         this.logger.info('[▸] Validating security requirements...');
         
-        // Check for secure API key storage
         const apiKeys = ['MICROWORKERS_API_KEY', 'CLICKWORKER_API_KEY', 'SPARE5_API_KEY'];
         for (const keyName of apiKeys) {
             const key = this.config.get(keyName);
@@ -147,7 +127,6 @@ class HarvesterCore {
             }
         }
         
-        // Validate withdrawal address if configured
         const withdrawalAddr = this.config.get('WITHDRAWAL_ADDRESS');
         if (withdrawalAddr && !this.security.isValidEthereumAddress(withdrawalAddr)) {
             throw new Error('Invalid withdrawal address format');
@@ -158,13 +137,12 @@ class HarvesterCore {
     }
 
     validateTaskSecurity(task) {
-        // Check for suspicious task properties
         if (task.reward > 10) {
             this.logger.warn(`[--] Suspicious high reward task: ${task.reward} ETH`);
             return false;
         }
         
-        if (task.estimatedTime > 86400) { // More than 24 hours
+        if (task.estimatedTime > 86400) {
             this.logger.warn(`[--] Suspicious long duration task: ${task.estimatedTime}s`);
             return false;
         }
@@ -180,13 +158,9 @@ class HarvesterCore {
     calculateTaskPriority(task) {
         let priority = 0;
         
-        // Reward weight (higher reward = higher priority)
         priority += task.reward * 100;
-        
-        // Time weight (shorter tasks = higher priority)
         priority += (3600 - Math.min(task.estimatedTime, 3600)) / 10;
         
-        // Platform preference
         const platformPriority = {
             microworkers: 3,
             clickworker: 2,
@@ -194,36 +168,32 @@ class HarvesterCore {
         };
         priority += (platformPriority[task.platform] || 0) * 10;
         
-        // Category preference - favor automatable tasks
         const categoryPriority = {
-            search_tasks: 10,        // Highly automatable
-            website_review: 8,       // Highly automatable
-            social_content: 6,       // Medium automatable
-            data_entry: 7,          // Medium automatable
-            survey: 5,              // Low automatable
-            video_tasks: 4,         // Low automatable
-            email_tasks: 3,         // Complex (needs verification)
-            account_creation: 2,    // Complex (needs verification)
-            creative_tasks: 1       // Not automatable
+            search_tasks: 10,
+            website_review: 8,
+            social_content: 6,
+            data_entry: 7,
+            survey: 5,
+            video_tasks: 4,
+            email_tasks: 3,
+            account_creation: 2,
+            creative_tasks: 1
         };
         priority += (categoryPriority[task.category] || 0) * 15;
         
-        // Deadline urgency
         if (task.deadline) {
             const timeToDeadline = task.deadline.getTime() - Date.now();
-            if (timeToDeadline < 24 * 60 * 60 * 1000) { // Less than 24 hours
+            if (timeToDeadline < 24 * 60 * 60 * 1000) {
                 priority += 50;
             }
         }
         
-        // Bonus for scraped tasks (they're more likely to be real)
         if (task.scraped) {
             priority += 25;
         }
         
-        // Bonus for automatable tasks
         if (this.taskExecutor && this.taskExecutor.canExecuteTask && this.taskExecutor.canExecuteTask(task)) {
-            priority += 40; // Higher priority for tasks we can automate
+            priority += 40;
         }
         
         return Math.round(priority);
@@ -231,7 +201,6 @@ class HarvesterCore {
 
     mapTaskCategory(apiCategory) {
         const categoryMap = {
-            // Microworkers
             'web_research': 'website_review',
             'social_media_task': 'social_content',
             'mobile_app': 'app_testing',
@@ -239,15 +208,6 @@ class HarvesterCore {
             'surveys_polls': 'survey',
             'content_creation': 'creative_tasks',
             'verification_task': 'verification',
-            
-            // Clickworker
-            'web_research': 'website_review',
-            'data_entry': 'data_entry',
-            'content_writing': 'creative_tasks',
-            'translation': 'translation',
-            'survey': 'survey',
-            
-            // Spare5
             'categorization': 'data_entry',
             'transcription': 'transcription',
             'image_tagging': 'image_tagging',
@@ -271,10 +231,8 @@ class HarvesterCore {
         try {
             this.logger.info('[▸] Initializing HarvesterCore V4.2.1 for REAL EXECUTION...');
             
-            // Security validation
             await this.validateSecurityRequirements();
             
-            // Initialize scraper if needed
             if (this.useScrapingFallback) {
                 this.logger.info('[▸] Initializing enhanced web scraper...');
                 this.microworkersScraper = new MicroworkersScraper(this.system);
@@ -282,7 +240,6 @@ class HarvesterCore {
                 this.logger.success('[✓] Enhanced web scraper initialized');
             }
             
-            // Initialize task executor for REAL automation
             if (this.useRealExecution) {
                 this.logger.info('[▸] Initializing TaskExecutor for real automation...');
                 this.taskExecutor = new TaskExecutor(this.system);
@@ -290,10 +247,7 @@ class HarvesterCore {
                 this.logger.success('[✓] TaskExecutor ready - Real automation enabled');
             }
             
-            // Initialize platforms with REAL API connections
             await this.initializePlatforms();
-            
-            // Load task queue from REAL APIs
             await this.loadProductionTasks();
             
             this.isInitialized = true;
@@ -302,544 +256,7 @@ class HarvesterCore {
             return { success: true, message: 'HarvesterCore V4.2.1 initialized for REAL EXECUTION' };
             
         } catch (error) {
-            this.logger.error(`[CW] Fetch failed: ${error.message}`);
-            return [];
-        }
-    }
-
-    async fetchSpare5Tasks() {
-        const platform = this.platforms.spare5;
-        const endpoint = '/tasks/available';
-        const headers = {
-            'Authorization': `Bearer ${platform.config.apiKey}`,
-            'Content-Type': 'application/json'
-        };
-        
-        try {
-            const response = await this.makeHttpRequest('GET', platform.baseUrl + endpoint, null, headers);
-            
-            if (response.statusCode === 200) {
-                const data = JSON.parse(response.body);
-                const tasks = data.tasks || data.data || [];
-                
-                return tasks.map(task => this.normalizeSpare5Task(task));
-            } else {
-                throw new Error(`API returned ${response.statusCode}: ${response.body}`);
-            }
-        } catch (error) {
-            this.logger.error(`[S5] Fetch failed: ${error.message}`);
-            return [];
-        }
-    }
-
-    normalizeMicroworkersTask(campaign) {
-        return {
-            id: `mw_${campaign.id}`,
-            originalId: campaign.id,
-            title: campaign.title || campaign.name || 'Microworkers Task',
-            description: campaign.description || campaign.brief || '',
-            category: this.mapTaskCategory(campaign.category || 'general'),
-            reward: this.parseReward(campaign.reward || campaign.payment || 0),
-            estimatedTime: parseInt(campaign.duration || campaign.estimated_time || 300),
-            instructions: campaign.instructions || campaign.description || '',
-            requirements: campaign.requirements || [],
-            deadline: campaign.deadline ? new Date(campaign.deadline) : new Date(Date.now() + 24 * 60 * 60 * 1000),
-            maxWorkers: campaign.max_workers || 1,
-            availableSlots: campaign.available_slots || 1,
-            createdAt: new Date(),
-            attempts: 0,
-            maxAttempts: 3,
-            originalData: campaign
-        };
-    }
-
-    normalizeClickworkerTask(job) {
-        return {
-            id: `cw_${job.id}`,
-            originalId: job.id,
-            title: job.title || job.name || 'Clickworker Job',
-            description: job.description || job.brief || '',
-            category: this.mapTaskCategory(job.type || job.category || 'general'),
-            reward: this.parseReward(job.payment || job.reward || 0),
-            estimatedTime: parseInt(job.duration || job.time_estimate || 300),
-            instructions: job.instructions || job.description || '',
-            requirements: job.qualifications || [],
-            deadline: job.deadline ? new Date(job.deadline) : new Date(Date.now() + 24 * 60 * 60 * 1000),
-            maxWorkers: job.max_assignments || 1,
-            availableSlots: job.available_assignments || 1,
-            createdAt: new Date(),
-            attempts: 0,
-            maxAttempts: 3,
-            originalData: job
-        };
-    }
-
-    normalizeSpare5Task(task) {
-        return {
-            id: `s5_${task.id}`,
-            originalId: task.id,
-            title: task.title || task.name || 'Spare5 Task',
-            description: task.description || task.brief || '',
-            category: this.mapTaskCategory(task.task_type || task.category || 'general'),
-            reward: this.parseReward(task.payout || task.payment || 0),
-            estimatedTime: parseInt(task.estimated_duration || task.duration || 180),
-            instructions: task.instructions || task.description || '',
-            requirements: task.requirements || [],
-            deadline: task.expires_at ? new Date(task.expires_at) : new Date(Date.now() + 12 * 60 * 60 * 1000),
-            maxWorkers: task.max_contributors || 1,
-            availableSlots: task.remaining_slots || 1,
-            createdAt: new Date(),
-            attempts: 0,
-            maxAttempts: 2,
-            originalData: task
-        };
-    }
-
-    // HTTP request helper for REAL API calls
-    async makeHttpRequest(method, url, data = null, headers = {}) {
-        return new Promise((resolve, reject) => {
-            const urlObj = new URL(url);
-            const options = {
-                hostname: urlObj.hostname,
-                port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
-                path: urlObj.pathname + urlObj.search,
-                method: method,
-                headers: {
-                    'User-Agent': 'GhostlineClean/4.2.1',
-                    ...headers
-                }
-            };
-            
-            if (data && method !== 'GET') {
-                const postData = typeof data === 'string' ? data : JSON.stringify(data);
-                options.headers['Content-Length'] = Buffer.byteLength(postData);
-                
-                if (!options.headers['Content-Type']) {
-                    options.headers['Content-Type'] = 'application/json';
-                }
-            }
-            
-            const req = https.request(options, (res) => {
-                let body = '';
-                res.on('data', chunk => body += chunk);
-                res.on('end', () => {
-                    resolve({
-                        statusCode: res.statusCode,
-                        headers: res.headers,
-                        body: body
-                    });
-                });
-            });
-            
-            req.on('error', reject);
-            
-            if (data && method !== 'GET') {
-                const postData = typeof data === 'string' ? data : JSON.stringify(data);
-                req.write(postData);
-            }
-            
-            req.end();
-        });
-    }
-
-    // ✅ MAIN LOOP С АНТИПАЛЕВО
-    async executeMainLoop() {
-        this.logger.debug('[▸] Выполняем основной цикл harvester с антипалево проверками...');
-        this.metrics.taskCycles++;
-        
-        // ✅ АНТИПАЛЕВО ПРОВЕРКА ПЕРЕД ВЫПОЛНЕНИЕМ
-        if (this.taskFinder && !this.taskFinder.canMakeRequest()) {
-            const waitTime = this.taskFinder.getWaitTime();
-            const waitMinutes = Math.round(waitTime / 60000);
-            
-            this.logger.info(`[🛡️] Антипалево: пропускаем цикл, ждем ${waitMinutes} мин`);
-            this.metrics.breaksThisSession++;
-            
-            // Не делаем запросы, но можем обрабатывать существующие задания
-            if (this.taskQueue.length > 0) {
-                const task = this.taskQueue.shift();
-                await this.executeTask(task);
-            }
-            
-            return; // Пропускаем загрузку новых заданий
-        }
-        
-        // ✅ ОБРАБАТЫВАЕМ ЗАДАНИЯ В ОЧЕРЕДИ
-        if (this.taskQueue.length > 0) {
-            const task = this.taskQueue.shift();
-            await this.executeTask(task);
-        }
-        
-        // ✅ ОБНОВЛЯЕМ ОЧЕРЕДЬ ЕСЛИ НУЖНО (С УЧЕТОМ АНТИПАЛЕВО)
-        if (this.taskQueue.length < 5) {
-            try {
-                await this.loadProductionTasks();
-            } catch (error) {
-                this.logger.error(`[✗] Ошибка загрузки заданий: ${error.message}`);
-                this.metrics.errors++;
-            }
-        }
-        
-        // ✅ ОБНОВЛЯЕМ МЕТРИКИ АВТОМАТИЗАЦИИ
-        this.updateAutomationMetrics();
-        
-        // ✅ ОБНОВЛЯЕМ АНТИПАЛЕВО СТАТИСТИКУ
-        this.updateAntiDetectionMetrics();
-    }
-
-    async executeTask(task) {
-        const taskId = task.id;
-        const startTime = Date.now();
-        
-        // Add to active tasks
-        this.activeTasks.set(taskId, {
-            ...task,
-            startTime: new Date(),
-            status: 'executing'
-        });
-        
-        this.metrics.tasksInProgress++;
-        this.metrics.lastTaskTime = new Date();
-        
-        this.logger.info(`[▸] EXECUTING REAL TASK: ${task.title} (${task.platform})`);
-        
-        try {
-            const result = await this.performRealTaskExecution(task);
-            
-            if (result.success) {
-                await this.handleTaskSuccess(task, result, Date.now() - startTime);
-            } else {
-                await this.handleTaskFailure(task, result.error, Date.now() - startTime);
-            }
-            
-        } catch (error) {
-            await this.handleTaskFailure(task, error.message, Date.now() - startTime);
-        } finally {
-            this.activeTasks.delete(taskId);
-            this.metrics.tasksInProgress--;
-        }
-    }
-
-    async performRealTaskExecution(task) {
-        this.logger.info(`[◉] REAL TASK EXECUTION: ${task.id} on ${task.platform}`);
-        this.metrics.realTasksExecuted++;
-        
-        try {
-            // Security pre-check
-            if (!this.validateTaskSecurity(task)) {
-                throw new Error('Task failed final security validation');
-            }
-            
-            // Check if we can automate this task
-            if (this.useRealExecution && this.taskExecutor && this.taskExecutor.canExecuteTask(task)) {
-                this.logger.info(`[🤖] AUTOMATING TASK: ${task.title} (${task.category})`);
-                
-                // Execute task with real automation
-                const automationResult = await this.taskExecutor.executeTask(task);
-                
-                if (automationResult.success) {
-                    this.logger.success(`[✓] AUTOMATED EXECUTION SUCCESS: ${task.title}`);
-                    this.metrics.automatedTasks++;
-                    
-                    return {
-                        success: true,
-                        taskId: task.id,
-                        originalId: task.originalId,
-                        platform: task.platform,
-                        category: task.category,
-                        reward: task.reward,
-                        completionTime: new Date(),
-                        qualityScore: 95,
-                        isProduction: true,
-                        automated: true,
-                        realExecution: true,
-                        executionDetails: automationResult,
-                        executionTime: automationResult.executionTime
-                    };
-                } else {
-                    this.logger.warn(`[--] Automation failed: ${automationResult.error}, falling back to simulation`);
-                    return await this.performSimulatedExecution(task);
-                }
-            } else {
-                this.logger.info(`[◎] SIMULATED EXECUTION: ${task.title} (category: ${task.category} not automatable)`);
-                return await this.performSimulatedExecution(task);
-            }
-            
-        } catch (error) {
-            this.logger.error(`[✗] REAL task execution failed: ${error.message}`);
-            return {
-                success: false,
-                error: error.message,
-                taskId: task.id,
-                platform: task.platform,
-                automated: false
-            };
-        }
-    }
-
-    async performSimulatedExecution(task) {
-        // Simulate realistic task execution timing
-        const executionTime = Math.max(5000, task.estimatedTime * 1000 / 8);
-        await this.sleep(executionTime);
-        
-        this.metrics.simulatedTasks++;
-        
-        // Generate realistic completion result
-        const qualityScore = 82 + Math.floor(Math.random() * 15);
-        const success = qualityScore > 85;
-        
-        if (success) {
-            return {
-                success: true,
-                taskId: task.id,
-                originalId: task.originalId,
-                platform: task.platform,
-                category: task.category,
-                reward: task.reward,
-                completionTime: new Date(),
-                qualityScore: qualityScore,
-                isProduction: true,
-                automated: false,
-                realExecution: false,
-                simulated: true,
-                executionTime: executionTime
-            };
-        } else {
-            throw new Error(`Quality check failed: ${qualityScore}% (minimum 85%)`);
-        }
-    }
-
-    async handleTaskSuccess(task, result, duration) {
-        this.metrics.tasksSuccessful++;
-        this.metrics.tasksCompleted++;
-        this.metrics.totalEarnings += task.reward;
-        this.metrics.lastSuccessTime = new Date();
-        
-        this.completedTasks.push({
-            ...task,
-            result: result,
-            duration: duration,
-            completedAt: new Date()
-        });
-        
-        const automationLabel = result.automated ? '[🤖 AUTOMATED]' : '[◎ SIMULATED]';
-        this.logger.success(`[✓] Task completed ${automationLabel}: ${task.title} - $${task.reward.toFixed(4)}`);
-        
-        this.smartAnalyzer.learnFromTask(task, result);
-    }
-
-    async handleTaskFailure(task, error, duration) {
-        this.metrics.tasksFailed++;
-        this.metrics.tasksCompleted++;
-        this.metrics.lastErrorTime = new Date();
-        
-        this.failedTasks.push({
-            ...task,
-            error: error,
-            duration: duration,
-            failedAt: new Date()
-        });
-        
-        this.logger.error(`[✗] Task failed: ${task.title} - ${error}`);
-        this.smartAnalyzer.learnFromTask(task, { success: false, error: error });
-    }
-
-    // ✅ НОВЫЕ АНТИПАЛЕВО МЕТОДЫ
-    updateAntiDetectionMetrics() {
-        if (this.taskFinder) {
-            const stats = this.taskFinder.getAntiDetectionStats();
-            this.metrics.requestsThisHour = stats.requestsThisHour;
-            this.metrics.antiDetectionEnabled = stats.canMakeRequest;
-        }
-    }
-
-    getAntiDetectionMetrics() {
-        if (this.taskFinder) {
-            return this.taskFinder.getAntiDetectionStats();
-        }
-        return {
-            enabled: false,
-            message: 'TaskFinder не инициализирован'
-        };
-    }
-
-    updateAutomationMetrics() {
-        if (this.completedTasks.length > 0) {
-            const automatedCount = this.completedTasks.filter(task => 
-                task.result && task.result.automated === true).length;
-            const totalCompleted = this.completedTasks.length;
-            
-            this.metrics.automationRate = ((automatedCount / totalCompleted) * 100).toFixed(1);
-        }
-    }
-
-    getAdaptiveInterval() {
-        if (!this.taskFinder) {
-            return this.scanInterval;
-        }
-        
-        const antiDetection = this.taskFinder.getAntiDetectionStats();
-        
-        if (!antiDetection.canMakeRequest) {
-            const adaptiveInterval = Math.max(this.scanInterval * 2, 300000);
-            this.logger.debug(`[⚙️] Адаптивный интервал (лимит): ${adaptiveInterval/1000}с`);
-            return adaptiveInterval;
-        }
-        
-        const usagePercent = antiDetection.requestsThisHour / antiDetection.maxRequestsPerHour;
-        if (usagePercent > 0.8) {
-            const adaptiveInterval = Math.round(this.scanInterval * 1.5);
-            this.logger.debug(`[⚙️] Адаптивный интервал (80% лимита): ${adaptiveInterval/1000}с`);
-            return adaptiveInterval;
-        }
-        
-        return this.scanInterval;
-    }
-
-    // ✅ START МЕТОД С АДАПТИВНЫМ ИНТЕРВАЛОМ
-    async start() {
-        if (this.isRunning) {
-            return { success: false, message: '[○] HarvesterCore is already running' };
-        }
-
-        if (!this.isInitialized) {
-            const initResult = await this.initialize();
-            if (!initResult.success) {
-                return initResult;
-            }
-        }
-
-        try {
-            this.isRunning = true;
-            this.startTime = new Date();
-            
-            this.logger.success('[◉] HarvesterCore V4.2.1 запущен в PRODUCTION MODE с антипалево защитой');
-            
-            // ✅ ЗАПУСКАЕМ ПЕРВЫЙ ЦИКЛ
-            await this.executeMainLoop();
-            
-            // ✅ НАСТРАИВАЕМ АДАПТИВНЫЙ RECURRING EXECUTION
-            this.setupAdaptiveExecution();
-
-            return { 
-                success: true, 
-                message: '[◉] HarvesterCore V4.2.1 активирован с антипалево защитой'
-            };
-            
-        } catch (error) {
-            this.logger.error(`[✗] Start failed: ${error.message}`);
-            return { success: false, message: error.message };
-        }
-    }
-
-    setupAdaptiveExecution() {
-        const executeWithAdaptiveInterval = async () => {
-            if (!this.isRunning) return;
-            
-            await this.executeMainLoop();
-            
-            const currentInterval = this.scanInterval;
-            const adaptiveInterval = this.getAdaptiveInterval();
-            
-            if (adaptiveInterval !== currentInterval) {
-                this.logger.info(`[⚙️] Адаптивный интервал: ${currentInterval/1000}с → ${adaptiveInterval/1000}с`);
-                this.metrics.adaptiveIntervalChanges++;
-            }
-            
-            if (this.isRunning) {
-                this.intervalId = setTimeout(executeWithAdaptiveInterval, adaptiveInterval);
-            }
-        };
-        
-        this.intervalId = setTimeout(executeWithAdaptiveInterval, this.scanInterval);
-        this.logger.info(`[⚙️] Адаптивное выполнение настроено с базовым интервалом ${this.scanInterval/1000}с`);
-    }
-
-    async stop() {
-        if (!this.isRunning) {
-            return { success: false, message: '[○] HarvesterCore is not running' };
-        }
-
-        try {
-            this.isRunning = false;
-            
-            if (this.intervalId) {
-                clearTimeout(this.intervalId);
-                this.intervalId = null;
-                this.logger.info('[✓] Адаптивный таймер остановлен');
-            }
-            
-            if (this.taskExecutor) {
-                await this.taskExecutor.close();
-                this.logger.success('[✓] TaskExecutor закрыт');
-            }
-            
-            if (this.microworkersScraper) {
-                await this.microworkersScraper.close();
-                this.logger.success('[✓] Enhanced web scraper закрыт');
-            }
-            
-            this.logger.success('[◯] HarvesterCore V4.2.1 остановлен корректно');
-            return { success: true, message: '[◯] HarvesterCore V4.2.1 остановлен успешно' };
-            
-        } catch (error) {
-            this.logger.error(`[✗] Stop failed: ${error.message}`);
-            return { success: false, message: error.message };
-        }
-    }
-
-    // Public interface methods
-    getTotalEarnings() { return this.metrics.totalEarnings; }
-    getTotalTasks() { return this.metrics.tasksCompleted; }
-    getActiveTasks() { return this.activeTasks.size; }
-    getPendingEarnings() { return this.metrics.pendingEarnings; }
-    getSuccessRate() { 
-        const total = this.metrics.tasksSuccessful + this.metrics.tasksFailed;
-        return total > 0 ? `${(this.metrics.tasksSuccessful / total * 100).toFixed(1)}%` : '0%';
-    }
-
-    getDetailedMetrics() {
-        const baseMetrics = {
-            ...this.metrics,
-            successRate: this.getSuccessRate(),
-            antiDetection: this.getAntiDetectionMetrics(),
-            antiDetectionDetails: {
-                enabled: this.metrics.antiDetectionEnabled,
-                requestsThisHour: this.metrics.requestsThisHour,
-                breaksThisSession: this.metrics.breaksThisSession,
-                adaptiveIntervalChanges: this.metrics.adaptiveIntervalChanges,
-                currentInterval: this.scanInterval,
-                adaptiveInterval: this.getAdaptiveInterval()
-            }
-        };
-        
-        return baseMetrics;
-    }
-
-    healthCheck() {
-        return {
-            status: this.isRunning ? 'running' : (this.isInitialized ? 'ready' : 'initializing'),
-            version: this.version,
-            uptime: this.startTime ? Date.now() - this.startTime.getTime() : 0,
-            antiDetection: this.getAntiDetectionMetrics(),
-            metrics: {
-                tasks_completed: this.metrics.tasksCompleted,
-                success_rate: this.getSuccessRate(),
-                total_earnings: this.metrics.totalEarnings,
-                anti_detection_active: this.metrics.antiDetectionEnabled,
-                requests_this_hour: this.metrics.requestsThisHour,
-                breaks_this_session: this.metrics.breaksThisSession
-            },
-            timestamp: new Date().toISOString()
-        };
-    }
-
-    sleep(milliseconds) {
-        return new Promise(resolve => setTimeout(resolve, milliseconds));
-    }
-}
-
-module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${error.message}`);
+            this.logger.error(`[✗] Initialization failed: ${error.message}`);
             return { success: false, message: error.message };
         }
     }
@@ -862,7 +279,6 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
                         enabledPlatforms++;
                         this.logger.success(`[✓] ${platform.name}: CONNECTED (Production)`);
                         
-                        // Log successful platform connection
                         await this.logger.logSecurity('platform_connected', {
                             platform: platformName,
                             mode: 'production',
@@ -880,13 +296,11 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
             }
         }
         
-        // Consider scraping as a valid platform
         if (this.useScrapingFallback && this.microworkersScraper) {
             enabledPlatforms++;
             this.logger.success('[✓] Microworkers Enhanced Web Scraping: AVAILABLE');
         }
         
-        // Show automation status
         if (this.useRealExecution && this.taskExecutor) {
             this.logger.success('[✓] TaskExecutor: Real Automation ENABLED');
             const status = this.taskExecutor.getStatus();
@@ -902,17 +316,6 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
         }
         
         this.logger.success(`[◉] PRODUCTION MODE: ${enabledPlatforms} platforms enabled + Real Automation`);
-        
-        // Log production mode activation with automation status
-        await this.logger.logSecurity('production_mode_activated', {
-            enabledPlatforms: enabledPlatforms,
-            platforms: Object.entries(this.platforms)
-                .filter(([name, platform]) => platform.enabled)
-                .map(([name]) => name),
-            scrapingEnabled: this.useScrapingFallback,
-            realAutomation: this.useRealExecution,
-            automationCapabilities: this.taskExecutor ? Object.keys(this.taskExecutor.getStatus().capabilities).filter(cap => this.taskExecutor.getStatus().capabilities[cap]) : []
-        });
     }
 
     async testRealPlatformConnection(platformName) {
@@ -955,7 +358,7 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
             'User-Agent': 'GhostlineClean/4.2.1'
         };
         
-        // ✅ ОТЛАДКА API ПОДКЛЮЧЕНИЯ
+        // ✅ ДЕТАЛЬНАЯ ОТЛАДКА API
         this.logger.info(`[🔍] MW API Test: ${platform.baseUrl}${endpoint}`);
         this.logger.info(`[🔑] MW API Key: ${platform.config.apiKey ? platform.config.apiKey.substring(0, 8) + '...' : 'MISSING'}`);
         this.logger.info(`[📤] MW Headers:`, JSON.stringify(headers));
@@ -963,7 +366,7 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
         try {
             const response = await this.makeHttpRequest('GET', platform.baseUrl + endpoint, null, headers);
             
-            // ✅ ОТЛАДКА ОТВЕТА
+            // ✅ ДЕТАЛЬНАЯ ОТЛАДКА ОТВЕТА
             this.logger.info(`[📥] MW API Response Status: ${response.statusCode}`);
             this.logger.info(`[📥] MW API Response Headers:`, JSON.stringify(response.headers));
             this.logger.info(`[📥] MW API Response Body:`, response.body.substring(0, 500));
@@ -1049,7 +452,6 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
                 this.logger.info(`[▸] Fetching tasks from ${platform.name}...`);
                 const tasks = await this.fetchRealTasksFromPlatform(platformName);
                 
-                // Security validation and prioritization
                 const validTasks = [];
                 for (const task of tasks) {
                     if (this.validateTaskSecurity(task)) {
@@ -1058,12 +460,10 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
                         task.isProduction = true;
                         task.securityValidated = true;
                         
-                        // Smart analysis and filtering
                         const analysis = this.smartAnalyzer.analyzeTask(task);
                         task.smartScore = analysis.totalScore;
                         task.recommendation = analysis.recommendation;
                         
-                        // Keep only good tasks (score >= 60)
                         if (analysis.totalScore < 60) {
                             this.logger.debug(`[--] Task skipped by AI: ${task.title} (score: ${analysis.totalScore})`);
                             continue;
@@ -1082,7 +482,6 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
                 
                 this.logger.success(`[✓] ${platform.name}: ${validTasks.length} validated tasks loaded`);
                 
-                // Rate limiting between platform calls
                 this.taskQueue.sort((a, b) => b.smartScore - a.smartScore);
                 
             } catch (error) {
@@ -1091,7 +490,6 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
             }
         }
         
-        // Sort by priority
         this.taskQueue.sort((a, b) => b.priority - a.priority);
         
         this.logger.success(`[✓] ${totalNewTasks} REAL production tasks loaded and prioritized`);
@@ -1114,7 +512,7 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
         }
     }
 
-    // ✅ НОВЫЙ ИСПРАВЛЕННЫЙ МЕТОД ПОИСКА ЗАДАНИЙ С ОТЛАДКОЙ
+    // ✅ ИСПРАВЛЕННЫЙ МЕТОД С ДЕТАЛЬНОЙ ОТЛАДКОЙ
     async fetchMicroworkersTasks() {
         this.logger.info('[🔍] Используем улучшенный поиск заданий с детальной отладкой...');
         
@@ -1133,12 +531,11 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
             if (tasks && tasks.length > 0) {
                 this.logger.success(`[✓] TaskFinderFix нашел ${tasks.length} заданий с детальной отладкой`);
                 this.metrics.antiDetectionEnabled = true;
-                return tasks; // Уже нормализованы
+                return tasks;
             }
             
             this.logger.info('[--] TaskFinderFix не нашел заданий, пробуем legacy методы...');
             
-            // ✅ ФОЛЛБЕК НА LEGACY API + SCRAPING
             return await this.fetchMicroworkersTasksLegacy();
             
         } catch (error) {
@@ -1146,16 +543,13 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
             this.logger.error(`[✗] Stack trace: ${error.stack}`);
             this.metrics.errors++;
             
-            // ✅ ФОЛЛБЕК НА LEGACY ПРИ ОШИБКЕ
             return await this.fetchMicroworkersTasksLegacy();
         }
     }
 
-    // ✅ LEGACY МЕТОД С ДОПОЛНИТЕЛЬНОЙ ОТЛАДКОЙ
     async fetchMicroworkersTasksLegacy() {
         const platform = this.platforms.microworkers;
         
-        // Сначала пробуем оригинальный API
         try {
             this.logger.info('[▸] Пробуем legacy Microworkers API с отладкой...');
             
@@ -1202,7 +596,6 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
                 this.logger.info('[🕷️] Используем enhanced web scraping fallback...');
                 this.metrics.scrapingAttempts++;
                 
-                // Проверяем здоровье скрейпера
                 if (!(await this.microworkersScraper.isHealthy())) {
                     this.logger.info('[▸] Перезапуск нездорового скрейпера...');
                     await this.microworkersScraper.restart();
@@ -1213,7 +606,7 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
                 if (scrapedJobs.length > 0) {
                     this.metrics.scrapingSuccesses++;
                     this.logger.success(`[✓] Enhanced scraping нашел ${scrapedJobs.length} заданий`);
-                    return scrapedJobs; // Уже нормализованы скрейпером
+                    return scrapedJobs;
                 } else {
                     this.logger.warn('[--] Enhanced scraping не нашел заданий');
                 }
@@ -1226,7 +619,6 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
             this.logger.warn('[--] Web scraping отключен или недоступен');
         }
         
-        // ✅ НИЧЕГО НЕ НАЙДЕНО
         this.logger.warn('[❌] Задания недоступны через все методы поиска');
         return [];
     }
@@ -1251,7 +643,7 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
                 throw new Error(`API returned ${response.statusCode}: ${response.body}`);
             }
         } catch (error) {
-           this.logger.error(`[CW] Fetch failed: ${error.message}`);
+            this.logger.error(`[CW] Fetch failed: ${error.message}`);
             return [];
         }
     }
@@ -1765,4 +1157,4 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
     }
 }
 
-module.exports = HarvesterCore; 
+module.exports = HarvesterCore;
