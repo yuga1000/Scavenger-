@@ -1251,7 +1251,7 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
                 throw new Error(`API returned ${response.statusCode}: ${response.body}`);
             }
         } catch (error) {
-             this.logger.error(`[CW] Fetch failed: ${error.message}`);
+           this.logger.error(`[CW] Fetch failed: ${error.message}`);
             return [];
         }
     }
@@ -1765,4 +1765,4 @@ module.exports = HarvesterCore;.logger.error(`[✗] Initialization failed: ${err
     }
 }
 
-module.exports = HarvesterCore;
+module.exports = HarvesterCore; 
