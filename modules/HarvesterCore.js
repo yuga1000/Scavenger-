@@ -562,20 +562,109 @@ class HarvesterCore {
     }
 
     // ✅ НОВЫЙ ИСПРАВЛЕННЫЙ МЕТОД ПОИСКА ЗАДАНИЙ
-   async fetchMicroworkersTasks() {
-    this.logger.info('[🔍] ВЫЗОВ НОВОГО TaskFinderFix с отладкой...');
-    
-    try {
-        const tasks = await this.taskFinder.findAvailableTasks();
-        this.logger.info(`[✓] TaskFinderFix результат: ${tasks ? tasks.length : 'null'} заданий`);
-        return tasks || [];
-    } catch (error) {
-        this.logger.error(`[✗] TaskFinderFix ошибка: ${error.message}`);
-        return [];
-    }
-}
+   // ✅ НОВЫЙ ИСПРАВЛЕННЫЙ МЕТОД ПОИСКА ЗАДАНИЙ
+    async fetchMicroworkersTasks() {
+        const platform = this.platforms.microworkers;
+        
+        this.logger.info('[🔍] Используем улучшенный поиск заданий с антипалево защитой...');
+        
+        try {
+            // ✅ СНАЧАЛА ПРОБУЕМ НОВЫЙ TaskFinderFix
+            this.logger.info('[🔍] Вызываем TaskFinderFix с отладкой...');
+            const tasks = await this.taskFinder.findAvailableTasks();
+            this.logger.info(`[🔍] TaskFinderFix вернул: ${tasks ? tasks.length : 0} заданий`);
+            
+            if (tasks && tasks.length > 0) {
+                this.logger.success(`[✓] TaskFinderFix нашел ${tasks.length} заданий`);
+                this.metrics.antiDetectionEnabled = true;
+                return tasks; // Уже нормализованы
+            }
             
             this.logger.info('[--] TaskFinderFix не нашел заданий, пробуем legacy методы...');
+            
+            // ✅ ФОЛЛБЕК НА LEGACY API + SCRAPING
+            return await this.fetchMicroworkersTasksLegacy();
+            
+        } catch (error) {
+            this.logger.error(`[✗] Ошибка в TaskFinderFix: ${error.message}`);
+            this.metrics.errors++;
+            
+            // ✅ ФОЛЛБЕК НА LEGACY ПРИ ОШИБКЕ
+            return await this.fetchMicroworkersTasksLegacy();
+        }
+    }
+
+    // ✅ LEGACY МЕТОД
+    async fetchMicroworkersTasksLegacy() {
+        const platform = this.platforms.microworkers;
+        
+        // Сначала пробуем оригинальный API
+        try {
+            this.logger.info('[▸] Пробуем legacy Microworkers API...');
+            
+            const endpoint = '/basic-campaigns';
+            const headers = {
+                'Authorization': `Bearer ${platform.config.apiKey}`,
+                'Content-Type': 'application/json',
+                'User-Agent': 'GhostlineClean/4.2.1'
+            };
+            
+            const response = await this.makeHttpRequest('GET', platform.baseUrl + endpoint, null, headers);
+            
+            if (response.statusCode === 200) {
+                const data = JSON.parse(response.body);
+                const campaigns = data.items || [];
+                
+                if (campaigns.length > 0) {
+                    this.logger.success(`[✓] Legacy API вернул ${campaigns.length} кампаний`);
+                    return campaigns.map(campaign => this.normalizeMicroworkersTask(campaign));
+                } else {
+                    this.logger.warn('[--] Legacy API вернул пустой список, пробуем скрейпинг...');
+                }
+            } else if (response.statusCode === 401) {
+                this.logger.warn('[--] Legacy API: недействительные credentials');
+            } else {
+                this.logger.warn(`[--] Legacy API неудача: HTTP ${response.statusCode}`);
+            }
+        } catch (error) {
+            this.logger.warn(`[--] Legacy API ошибка: ${error.message}`);
+            this.metrics.platformErrors.microworkers = (this.metrics.platformErrors.microworkers || 0) + 1;
+        }
+        
+        // ✅ ФОЛЛБЕК НА ENHANCED SCRAPING
+        if (this.useScrapingFallback && this.microworkersScraper) {
+            try {
+                this.logger.info('[🕷️] Используем enhanced web scraping fallback...');
+                this.metrics.scrapingAttempts++;
+                
+                // Проверяем здоровье скрейпера
+                if (!(await this.microworkersScraper.isHealthy())) {
+                    this.logger.info('[▸] Перезапуск нездорового скрейпера...');
+                    await this.microworkersScraper.restart();
+                }
+                
+                const scrapedJobs = await this.microworkersScraper.getAvailableJobs();
+                
+                if (scrapedJobs.length > 0) {
+                    this.metrics.scrapingSuccesses++;
+                    this.logger.success(`[✓] Enhanced scraping нашел ${scrapedJobs.length} заданий`);
+                    return scrapedJobs; // Уже нормализованы скрейпером
+                } else {
+                    this.logger.warn('[--] Enhanced scraping не нашел заданий');
+                }
+                
+            } catch (error) {
+                this.metrics.scrapingErrors++;
+                this.logger.error(`[✗] Enhanced scraping неудача: ${error.message}`);
+            }
+        } else {
+            this.logger.warn('[--] Web scraping отключен или недоступен');
+        }
+        
+        // ✅ НИЧЕГО НЕ НАЙДЕНО
+        this.logger.warn('[❌] Задания недоступны через все методы поиска');
+        return [];
+    }
             
             // ✅ ФОЛЛБЕК НА LEGACY API + SCRAPING
             return await this.fetchMicroworkersTasksLegacy();
