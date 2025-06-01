@@ -35,7 +35,7 @@ class TaskFinderFix {
     (key) => ({ 'Authorization': `Bearer ${key}` }),
     (key) => ({ 'MW-API-Key': key }),
     (key) => ({ 'API-Secret': key })
-]
+],
                 webScraping: {
                     url: 'https://microworkers.com/jobs',
                     selectors: [
