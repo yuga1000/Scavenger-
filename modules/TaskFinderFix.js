@@ -1,4 +1,4 @@
-// TaskFinderFix V2.0 - Intelligent Multi-Source Task Discovery
+// TaskFinderFix V2.1 - Debug Enhanced Version
 // File: modules/TaskFinderFix.js
 
 const https = require('https');
@@ -15,32 +15,45 @@ class TaskFinderFix {
             apiKey: process.env.OPENAI_API_KEY
         }) : null;
         
-        // Multi-Source Configuration
+        // Multi-Source Configuration with DEBUG
         this.sources = {
             microworkers: {
                 enabled: true,
                 priority: 1,
                 endpoints: [
+                    // ✅ НОВЫЕ 2025 ЭНДПОИНТЫ
+                    '/ttv-api/available-campaigns',
+                    '/worker-api/campaigns/browse',
+                    '/public-api/v3/jobs',
+                    '/api/campaigns/open',
+                    // ✅ СТАРЫЕ ДЛЯ СРАВНЕНИЯ
                     '/ttv-api/campaigns/available',
-                    '/api/v2/worker/campaigns', 
+                    '/api/v2/worker/campaigns',
                     '/basic-campaigns',
                     '/hire-group-campaigns/browse',
                     '/public-api/jobs',
                     '/worker/dashboard/campaigns'
                 ],
-                baseUrl: 'https://ttv.microworkers.com/api/v2',
+                baseUrl: 'https://ttv.microworkers.com',
+                baseUrlAlt: 'https://ttv.microworkers.com/api/v2',
                 authMethods: [
-    (key) => ({ 'MicroworkersApiKey': key }), // ✅ ПРАВИЛЬНЫЙ
-    (key) => ({ 'X-API-Key': key }),
-    (key) => ({ 'Authorization': `Bearer ${key}` }),
-    (key) => ({ 'MW-API-Key': key }),
-    (key) => ({ 'API-Secret': key })
-],
+                    // ✅ НОВЫЕ 2025 МЕТОДЫ АВТОРИЗАЦИИ
+                    (key) => ({ 'MW-Token': key }),
+                    (key) => ({ 'X-Worker-Key': key }),
+                    (key) => ({ 'Authorization': `Token ${key}` }),
+                    (key) => ({ 'X-MW-Key': key }),
+                    // ✅ СТАРЫЕ МЕТОДЫ
+                    (key) => ({ 'MicroworkersApiKey': key }),
+                    (key) => ({ 'X-API-Key': key }),
+                    (key) => ({ 'Authorization': `Bearer ${key}` }),
+                    (key) => ({ 'MW-API-Key': key }),
+                    (key) => ({ 'API-Secret': key })
+                ],
                 webScraping: {
                     url: 'https://microworkers.com/jobs',
                     selectors: [
                         '.campaign-item',
-                        '.job-listing',
+                        '.job-listing', 
                         '.task-card',
                         '.available-job'
                     ]
@@ -55,73 +68,51 @@ class TaskFinderFix {
                     '/workplace/jobs',
                     '/api/tasks/open'
                 ],
-                baseUrl: 'https://workplace.clickworker.com/api/v1'
+                baseUrl: 'https://workplace.clickworker.com/api/v1',
+                authMethods: [
+                    (key) => ({ 'Authorization': `Bearer ${key}` }),
+                    (key) => ({ 'X-API-Key': key })
+                ]
             },
             
             spare5: {
-                enabled: true, 
+                enabled: true,
                 priority: 3,
                 endpoints: [
                     '/tasks/available',
                     '/fives/open',
                     '/marketplace/tasks'
                 ],
-                baseUrl: 'https://api.spare5.com/v2'
-            },
-            
-            // New sources for diversification
-            freelancer: {
-                enabled: false, // Enable after testing
-                priority: 4,
-                webScraping: {
-                    url: 'https://www.freelancer.com/jobs/micro-jobs',
-                    selectors: ['.JobSearchCard-item']
-                }
-            },
-            
-            rapidworkers: {
-                enabled: false,
-                priority: 5,
-                webScraping: {
-                    url: 'https://rapidworkers.com/find_jobs.php',
-                    selectors: ['.job-item']
-                }
+                baseUrl: 'https://api.spare5.com/v2',
+                authMethods: [
+                    (key) => ({ 'Authorization': `Bearer ${key}` }),
+                    (key) => ({ 'X-API-Key': key })
+                ]
             }
         };
         
-        // Advanced Anti-Detection System
+        // Enhanced Anti-Detection System
         this.antiDetection = {
             userAgents: [
-                // Chrome variants
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
                 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                
-                // Firefox variants
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
-                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/121.0',
-                
-                // Safari variants
-                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
-                
-                // Edge variants
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0'
+                'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             ],
             
             requestLimits: {
-                perHour: 60,           // Increased from 20
-                perMinute: 8,          // Distributed evenly  
-                burstLimit: 3,         // Max 3 rapid requests
-                cooldownAfter: 15      // Cooldown after 15 requests
+                perHour: 60,
+                perMinute: 8,
+                burstLimit: 3,
+                cooldownAfter: 15
             },
             
             timingPatterns: {
-                minDelay: 8000,        // Reduced from 30s
-                maxDelay: 25000,       // Reduced from 3min
-                errorDelay: 60000,     // 1min on errors
-                emptyDelay: 120000,    // 2min if no tasks
-                humanVariation: 0.3    // ±30% timing variation
+                minDelay: 8000,
+                maxDelay: 25000,
+                errorDelay: 60000,
+                emptyDelay: 120000,
+                humanVariation: 0.3
             },
             
             currentStats: {
@@ -138,44 +129,27 @@ class TaskFinderFix {
         this.aiAnalysis = {
             enabled: !!this.openai,
             categories: [
-                'high_automation',     // Fully automatable
-                'medium_automation',   // Partially automatable  
-                'low_automation',      // Manual with assistance
-                'not_automatable',     // Purely manual
-                'suspicious',          // Potentially fake/scam
-                'excellent_profit',    // High $/hour ratio
-                'good_profit',         // Decent $/hour
-                'poor_profit'          // Low value
-            ],
-            
-            prompts: {
-                taskAnalysis: `Analyze this task for automation potential and profitability:
-Title: {title}
-Description: {description}
-Payment: {reward}
-Time: {estimatedTime} minutes
-
-Rate on scales 1-10:
-- Automation potential (1=impossible, 10=fully automatable)
-- Profitability (1=very poor, 10=excellent) 
-- Legitimacy (1=likely scam, 10=definitely real)
-- Complexity (1=very simple, 10=very complex)
-
-Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "complexity": W, "category": "category_name", "reasoning": "brief explanation"}`
-            }
+                'high_automation',
+                'medium_automation',
+                'low_automation',
+                'not_automatable',
+                'suspicious',
+                'excellent_profit',
+                'good_profit',
+                'poor_profit'
+            ]
         };
         
-        // Intelligent Caching & Market Analysis
+        // Intelligence & Circuit Breakers
         this.intelligence = {
-            taskCache: new Map(),           // Cache discovered tasks
-            sourceHealth: new Map(),        // Track source reliability
-            marketTrends: new Map(),        // Track pricing/demand trends
-            optimalTiming: {                // Best times to search
+            taskCache: new Map(),
+            sourceHealth: new Map(),
+            marketTrends: new Map(),
+            optimalTiming: {
                 hourly: new Array(24).fill(0),
                 daily: new Array(7).fill(0),
                 trending: []
             },
-            
             learning: {
                 successfulSources: new Map(),
                 taskTypePreferences: new Map(),
@@ -183,11 +157,10 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
             }
         };
         
-        // Circuit Breaker Pattern for each source
         this.circuitBreakers = new Map();
         this.initializeCircuitBreakers();
         
-        this.logger.info('[🚀] TaskFinderFix V2.0 initialized with AI intelligence');
+        this.logger.info('[🚀] TaskFinderFix V2.1 with DEBUG initialized');
         this.logger.info(`[🧠] AI Analysis: ${this.aiAnalysis.enabled ? 'ENABLED' : 'DISABLED'}`);
         this.logger.info(`[🎯] Sources: ${Object.keys(this.sources).filter(s => this.sources[s].enabled).length} enabled`);
     }
@@ -195,20 +168,20 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
     initializeCircuitBreakers() {
         Object.keys(this.sources).forEach(sourceName => {
             this.circuitBreakers.set(sourceName, {
-                state: 'CLOSED',        // CLOSED, OPEN, HALF_OPEN
+                state: 'CLOSED',
                 failureCount: 0,
                 lastFailureTime: 0,
                 successCount: 0,
-                threshold: 5,           // Failures to open circuit
-                timeout: 300000,        // 5min before half-open
-                halfOpenMaxCalls: 3     // Test calls in half-open
+                threshold: 5,
+                timeout: 300000,
+                halfOpenMaxCalls: 3
             });
         });
     }
     
     async findAvailableTasks() {
         try {
-            this.logger.info('[🔍] Starting intelligent multi-source task hunt...');
+            this.logger.info('[🔍] Starting enhanced task hunt with DEBUG...');
             
             // Anti-detection check
             if (!this.canMakeRequest()) {
@@ -220,26 +193,31 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
             const allTasks = [];
             const sourcePriority = this.getSourcePriority();
             
-            // Hunt from multiple sources simultaneously
-            const huntPromises = sourcePriority.map(sourceName => 
-                this.huntFromSource(sourceName)
-            );
+            this.logger.info(`[🎯] Source priority: ${sourcePriority.join(' → ')}`);
             
-            // Wait for all sources (with timeout)
-            const results = await Promise.allSettled(huntPromises);
-            
-            // Collect successful results
-            results.forEach((result, index) => {
-                const sourceName = sourcePriority[index];
-                if (result.status === 'fulfilled' && result.value?.length > 0) {
-                    this.logger.success(`[✓] ${sourceName}: ${result.value.length} tasks`);
-                    allTasks.push(...result.value);
-                    this.updateSourceHealth(sourceName, true, result.value.length);
-                } else {
-                    this.logger.warn(`[--] ${sourceName}: ${result.status === 'rejected' ? result.reason?.message : 'no tasks'}`);
+            // Hunt from multiple sources
+            for (const sourceName of sourcePriority) {
+                try {
+                    this.logger.info(`[🔍] Hunting from ${sourceName}...`);
+                    const tasks = await this.huntFromSource(sourceName);
+                    
+                    if (tasks && tasks.length > 0) {
+                        this.logger.success(`[✓] ${sourceName}: Found ${tasks.length} tasks`);
+                        allTasks.push(...tasks);
+                        this.updateSourceHealth(sourceName, true, tasks.length);
+                    } else {
+                        this.logger.warn(`[--] ${sourceName}: No tasks found`);
+                        this.updateSourceHealth(sourceName, false);
+                    }
+                    
+                    // Anti-detection delay between sources
+                    await this.smartDelay(3000, 8000);
+                    
+                } catch (error) {
+                    this.logger.error(`[✗] ${sourceName} failed: ${error.message}`);
                     this.updateSourceHealth(sourceName, false);
                 }
-            });
+            }
             
             if (allTasks.length === 0) {
                 this.logger.warn('[❌] No tasks found across all sources');
@@ -249,13 +227,10 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
             // AI Analysis & Intelligent Filtering
             const analyzedTasks = await this.performAIAnalysis(allTasks);
             
-            // Smart Deduplication & Ranking  
+            // Smart Deduplication & Ranking
             const uniqueTasks = this.deduplicateAndRank(analyzedTasks);
             
-            this.logger.success(`[🎯] Found ${uniqueTasks.length} high-quality tasks (${allTasks.length} total)`);
-            
-            // Update learning systems
-            this.updateMarketIntelligence(uniqueTasks);
+            this.logger.success(`[🎯] Final result: ${uniqueTasks.length} high-quality tasks (${allTasks.length} total found)`);
             
             return uniqueTasks;
             
@@ -267,7 +242,10 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
     
     async huntFromSource(sourceName) {
         const source = this.sources[sourceName];
-        if (!source?.enabled) return [];
+        if (!source?.enabled) {
+            this.logger.debug(`[--] ${sourceName}: Disabled`);
+            return [];
+        }
         
         // Circuit breaker check
         const breaker = this.circuitBreakers.get(sourceName);
@@ -287,11 +265,13 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
             
             // Try API endpoints first
             if (source.endpoints) {
+                this.logger.info(`[🔍] ${sourceName}: Trying API endpoints...`);
                 tasks = await this.huntFromAPI(sourceName, source);
             }
             
-            // Fallback to web scraping if API fails and scraping available
+            // Fallback to web scraping if API fails
             if (tasks.length === 0 && source.webScraping) {
+                this.logger.info(`[🕷️] ${sourceName}: Fallback to web scraping...`);
                 tasks = await this.huntFromWeb(sourceName, source);
             }
             
@@ -323,54 +303,105 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
     
     async huntFromAPI(sourceName, source) {
         const tasks = [];
+        const apiKey = this.getApiKey(sourceName);
         
-        for (const endpoint of source.endpoints) {
-            // Skip if we already found tasks (optimization)
-            if (tasks.length > 10) break;
+        if (!apiKey) {
+            this.logger.warn(`[--] ${sourceName}: No API key configured`);
+            return [];
+        }
+        
+        this.logger.info(`[🔑] ${sourceName}: Using API key: ${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}`);
+        
+        // Try different base URLs if available
+        const baseUrls = [source.baseUrl];
+        if (source.baseUrlAlt) baseUrls.push(source.baseUrlAlt);
+        
+        for (const baseUrl of baseUrls) {
+            this.logger.info(`[🌐] ${sourceName}: Trying base URL: ${baseUrl}`);
             
-            for (const authMethod of source.authMethods || [source.authMethods?.[0]]) {
-                try {
-                    const apiKey = this.getApiKey(sourceName);
-                    if (!apiKey) continue;
-                    
-                    const headers = {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'User-Agent': this.getRandomUserAgent(),
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Accept-Encoding': 'gzip, deflate, br',
-                        'Cache-Control': 'no-cache',
-                        'DNT': '1',
-                        'Connection': 'keep-alive',
-                        'Sec-Fetch-Dest': 'empty',
-                        'Sec-Fetch-Mode': 'cors',
-                        'Sec-Fetch-Site': 'same-origin',
-                        ...authMethod(apiKey)
-                    };
-                    
-                    const response = await this.makeRequest('GET', source.baseUrl + endpoint, null, headers);
-                    
-                    if (response.statusCode >= 200 && response.statusCode < 300) {
-                        const data = JSON.parse(response.body);
-                        const extractedTasks = this.extractTasksFromResponse(data, sourceName);
+            for (const endpoint of source.endpoints) {
+                // Skip if we already found enough tasks
+                if (tasks.length > 10) break;
+                
+                this.logger.info(`[📡] ${sourceName}: Testing endpoint: ${endpoint}`);
+                
+                for (const authMethod of source.authMethods || []) {
+                    try {
+                        const headers = {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'User-Agent': this.getRandomUserAgent(),
+                            'Accept-Language': 'en-US,en;q=0.9',
+                            'Accept-Encoding': 'gzip, deflate, br',
+                            'Cache-Control': 'no-cache',
+                            'DNT': '1',
+                            'Connection': 'keep-alive',
+                            'Sec-Fetch-Dest': 'empty',
+                            'Sec-Fetch-Mode': 'cors',
+                            'Sec-Fetch-Site': 'same-origin',
+                            ...authMethod(apiKey)
+                        };
                         
-                        if (extractedTasks.length > 0) {
-                            this.logger.success(`[✓] ${sourceName}${endpoint}: ${extractedTasks.length} tasks`);
-                            tasks.push(...extractedTasks);
-                            break; // Success with this auth method
+                        // ✅ ДЕТАЛЬНАЯ ОТЛАДКА ЗАПРОСА
+                        this.logger.info(`[🔍] ${sourceName}: Making request to ${baseUrl}${endpoint}`);
+                        this.logger.info(`[🔍] ${sourceName}: Auth headers:`, JSON.stringify(authMethod(apiKey)));
+                        this.logger.info(`[🔍] ${sourceName}: Full headers:`, JSON.stringify(headers, null, 2));
+                        
+                        const response = await this.makeRequest('GET', baseUrl + endpoint, null, headers);
+                        
+                        // ✅ ДЕТАЛЬНАЯ ОТЛАДКА ОТВЕТА
+                        this.logger.info(`[📥] ${sourceName}${endpoint}: Status ${response.statusCode}`);
+                        this.logger.info(`[📥] ${sourceName}${endpoint}: Response headers:`, JSON.stringify(response.headers));
+                        this.logger.info(`[📥] ${sourceName}${endpoint}: Response body (first 1000 chars):`, response.body.substring(0, 1000));
+                        
+                        if (response.statusCode >= 200 && response.statusCode < 300) {
+                            try {
+                                const data = JSON.parse(response.body);
+                                this.logger.info(`[✅] ${sourceName}${endpoint}: Successfully parsed JSON`);
+                                this.logger.info(`[📊] ${sourceName}${endpoint}: Data structure:`, JSON.stringify(Object.keys(data)));
+                                
+                                const extractedTasks = this.extractTasksFromResponse(data, sourceName);
+                                
+                                if (extractedTasks.length > 0) {
+                                    this.logger.success(`[🎯] ${sourceName}${endpoint}: Extracted ${extractedTasks.length} tasks`);
+                                    tasks.push(...extractedTasks);
+                                    break; // Success with this auth method
+                                } else {
+                                    this.logger.warn(`[--] ${sourceName}${endpoint}: No tasks in response`);
+                                }
+                                
+                            } catch (parseError) {
+                                this.logger.error(`[❌] ${sourceName}${endpoint}: JSON parse error: ${parseError.message}`);
+                                this.logger.info(`[📝] ${sourceName}${endpoint}: Raw response: ${response.body}`);
+                            }
+                        } else if (response.statusCode === 401) {
+                            this.logger.warn(`[🚫] ${sourceName}${endpoint}: Unauthorized (401) - Invalid credentials`);
+                        } else if (response.statusCode === 403) {
+                            this.logger.warn(`[🚫] ${sourceName}${endpoint}: Forbidden (403) - Access denied`);
+                        } else if (response.statusCode === 404) {
+                            this.logger.warn(`[🚫] ${sourceName}${endpoint}: Not Found (404) - Endpoint may not exist`);
+                        } else if (response.statusCode === 429) {
+                            this.logger.warn(`[🚫] ${sourceName}${endpoint}: Rate Limited (429) - Too many requests`);
+                        } else if (response.statusCode >= 500) {
+                            this.logger.warn(`[🚫] ${sourceName}${endpoint}: Server Error (${response.statusCode})`);
+                        } else {
+                            this.logger.warn(`[🚫] ${sourceName}${endpoint}: Unexpected status ${response.statusCode}`);
+                        }
+                        
+                    } catch (error) {
+                        this.logger.error(`[❌] ${sourceName}${endpoint}: Request failed: ${error.message}`);
+                        if (error.code) {
+                            this.logger.info(`[📝] ${sourceName}${endpoint}: Error code: ${error.code}`);
                         }
                     }
                     
-                } catch (error) {
-                    this.logger.debug(`[--] ${sourceName}${endpoint}: ${error.message}`);
+                    // Anti-detection delay between auth methods
+                    await this.smartDelay(2000, 5000);
                 }
                 
-                // Anti-detection delay between auth methods
-                await this.smartDelay(2000, 5000);
+                // Anti-detection delay between endpoints
+                await this.smartDelay(3000, 8000);
             }
-            
-            // Anti-detection delay between endpoints
-            await this.smartDelay(3000, 8000);
         }
         
         return tasks;
@@ -378,7 +409,7 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
     
     async huntFromWeb(sourceName, source) {
         try {
-            this.logger.info(`[🕷️] Web scraping ${sourceName}...`);
+            this.logger.info(`[🕷️] ${sourceName}: Starting web scraping from ${source.webScraping.url}`);
             
             const headers = {
                 'User-Agent': this.getRandomUserAgent(),
@@ -389,45 +420,105 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
                 'Upgrade-Insecure-Requests': '1'
             };
             
+            this.logger.info(`[🔍] ${sourceName}: Web scraping headers:`, JSON.stringify(headers));
+            
             const response = await this.makeRequest('GET', source.webScraping.url, null, headers);
+            
+            this.logger.info(`[📥] ${sourceName}: Web scraping status: ${response.statusCode}`);
+            this.logger.info(`[📥] ${sourceName}: Page size: ${response.body.length} chars`);
             
             if (response.statusCode === 200) {
                 const tasks = this.parseHTMLForTasks(response.body, source.webScraping.selectors, sourceName);
-                this.logger.success(`[✓] ${sourceName} web scraping: ${tasks.length} tasks`);
+                this.logger.success(`[✅] ${sourceName}: Web scraping found ${tasks.length} tasks`);
                 return tasks;
+            } else {
+                this.logger.warn(`[--] ${sourceName}: Web scraping failed with status ${response.statusCode}`);
             }
             
             return [];
             
         } catch (error) {
-            this.logger.warn(`[--] ${sourceName} web scraping failed: ${error.message}`);
+            this.logger.error(`[❌] ${sourceName}: Web scraping error: ${error.message}`);
             return [];
         }
     }
     
     extractTasksFromResponse(data, sourceName) {
-        // Handle different response formats
-        const items = data.items || data.data || data.campaigns || data.tasks || data.jobs || [];
-        if (!Array.isArray(items)) return [];
+        this.logger.info(`[📊] ${sourceName}: Analyzing response structure...`);
         
-        return items.map(item => this.normalizeTask(item, sourceName)).filter(Boolean);
+        // Handle different response formats
+        let items = [];
+        
+        if (Array.isArray(data)) {
+            items = data;
+            this.logger.info(`[📊] ${sourceName}: Response is array with ${items.length} items`);
+        } else if (data.items && Array.isArray(data.items)) {
+            items = data.items;
+            this.logger.info(`[📊] ${sourceName}: Found items array with ${items.length} items`);
+        } else if (data.data && Array.isArray(data.data)) {
+            items = data.data;
+            this.logger.info(`[📊] ${sourceName}: Found data array with ${items.length} items`);
+        } else if (data.campaigns && Array.isArray(data.campaigns)) {
+            items = data.campaigns;
+            this.logger.info(`[📊] ${sourceName}: Found campaigns array with ${items.length} items`);
+        } else if (data.tasks && Array.isArray(data.tasks)) {
+            items = data.tasks;
+            this.logger.info(`[📊] ${sourceName}: Found tasks array with ${items.length} items`);
+        } else if (data.jobs && Array.isArray(data.jobs)) {
+            items = data.jobs;
+            this.logger.info(`[📊] ${sourceName}: Found jobs array with ${items.length} items`);
+        } else {
+            this.logger.warn(`[--] ${sourceName}: No recognizable array found in response`);
+            this.logger.info(`[📝] ${sourceName}: Available keys:`, Object.keys(data));
+            return [];
+        }
+        
+        if (items.length === 0) {
+            this.logger.warn(`[--] ${sourceName}: Array is empty`);
+            return [];
+        }
+        
+        this.logger.info(`[📊] ${sourceName}: Sample item structure:`, JSON.stringify(Object.keys(items[0] || {})));
+        
+        const normalizedTasks = items.map((item, index) => {
+            try {
+                const task = this.normalizeTask(item, sourceName);
+                if (task) {
+                    this.logger.debug(`[✓] ${sourceName}: Normalized task ${index + 1}: ${task.title}`);
+                    return task;
+                }
+            } catch (error) {
+                this.logger.warn(`[--] ${sourceName}: Failed to normalize item ${index + 1}: ${error.message}`);
+            }
+            return null;
+        }).filter(Boolean);
+        
+        this.logger.info(`[📊] ${sourceName}: Successfully normalized ${normalizedTasks.length}/${items.length} tasks`);
+        
+        return normalizedTasks;
     }
     
     parseHTMLForTasks(html, selectors, sourceName) {
-        // Simple HTML parsing without external dependencies
         const tasks = [];
         
+        this.logger.info(`[🔍] ${sourceName}: Parsing HTML (${html.length} chars) with selectors: ${selectors.join(', ')}`);
+        
         selectors.forEach(selector => {
-            // Basic regex-based extraction (would be better with cheerio in production)
             const classMatch = selector.replace('.', '');
             const regex = new RegExp(`class="[^"]*${classMatch}[^"]*"[^>]*>([\\s\\S]*?)</[^>]+>`, 'gi');
             let match;
+            let count = 0;
             
-            while ((match = regex.exec(html)) !== null) {
+            while ((match = regex.exec(html)) !== null && count < 50) {
                 const taskHtml = match[1];
                 const task = this.extractTaskFromHTML(taskHtml, sourceName);
-                if (task) tasks.push(task);
+                if (task) {
+                    tasks.push(task);
+                    count++;
+                }
             }
+            
+            this.logger.info(`[📊] ${sourceName}: Selector "${selector}" found ${count} tasks`);
         });
         
         return tasks;
@@ -457,6 +548,8 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
     
     normalizeTask(rawTask, sourceName) {
         try {
+            this.logger.debug(`[🔧] ${sourceName}: Normalizing task with keys: ${Object.keys(rawTask).join(', ')}`);
+            
             const task = {
                 id: `${sourceName}_${rawTask.id || rawTask.campaign_id || Math.random().toString(36)}`,
                 originalId: rawTask.id || rawTask.campaign_id,
@@ -487,13 +580,15 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
             
             // Basic validation
             if (!task.title || task.reward <= 0 || task.title.length < 3) {
+                this.logger.debug(`[--] ${sourceName}: Task failed validation: title="${task.title}", reward=${task.reward}`);
                 return null;
             }
             
+            this.logger.debug(`[✓] ${sourceName}: Task normalized: "${task.title}" - $${task.reward}`);
             return task;
             
         } catch (error) {
-            this.logger.debug(`[--] Task normalization failed: ${error.message}`);
+            this.logger.warn(`[--] ${sourceName}: Task normalization failed: ${error.message}`);
             return null;
         }
     }
@@ -547,14 +642,22 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
     
     async analyzeTaskWithAI(task) {
         try {
-            const prompt = this.aiAnalysis.prompts.taskAnalysis
-                .replace('{title}', task.title)
-                .replace('{description}', task.description)
-                .replace('{reward}', task.reward)
-                .replace('{estimatedTime}', Math.round(task.estimatedTime / 60));
+            const prompt = `Analyze this task for automation potential and profitability:
+Title: ${task.title}
+Description: ${task.description}
+Payment: ${task.reward}
+Time: ${Math.round(task.estimatedTime / 60)} minutes
+
+Rate on scales 1-10:
+- Automation potential (1=impossible, 10=fully automatable)
+- Profitability (1=very poor, 10=excellent) 
+- Legitimacy (1=likely scam, 10=definitely real)
+- Complexity (1=very simple, 10=very complex)
+
+Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "complexity": W, "category": "category_name", "reasoning": "brief explanation"}`;
             
             const response = await this.openai.chat.completions.create({
-                model: "gpt-4o-mini", // Faster and cheaper for analysis
+                model: "gpt-4o-mini",
                 messages: [{ role: "user", content: prompt }],
                 max_tokens: 200,
                 temperature: 0.3
@@ -902,7 +1005,11 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
                 'X-API-Key': apiKey
             };
             
-            const response = await this.makeRequest('GET', source.baseUrl + '/basic-campaigns', null, headers);
+            this.logger.info(`[🔍] Basic campaigns: Making request with key ${apiKey.substring(0, 8)}...`);
+            
+            const response = await this.makeRequest('GET', source.baseUrlAlt + '/basic-campaigns', null, headers);
+            
+            this.logger.info(`[📥] Basic campaigns response: ${response.statusCode} - ${response.body.substring(0, 500)}`);
             
             if (response.statusCode === 200) {
                 const data = JSON.parse(response.body);
@@ -939,7 +1046,11 @@ Respond in JSON format: {"automation": X, "profitability": Y, "legitimacy": Z, "
                         'Authorization': `Bearer ${apiKey}`
                     };
                     
+                    this.logger.info(`[🔍] Public search: ${sourceName}${endpoint}`);
+                    
                     const response = await this.makeRequest('GET', source.baseUrl + endpoint, null, headers);
+                    
+                    this.logger.info(`[📥] Public search response: ${response.statusCode} - ${response.body.substring(0, 300)}`);
                     
                     if (response.statusCode === 200) {
                         const data = JSON.parse(response.body);
