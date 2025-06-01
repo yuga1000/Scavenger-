@@ -562,24 +562,18 @@ class HarvesterCore {
     }
 
     // ✅ НОВЫЙ ИСПРАВЛЕННЫЙ МЕТОД ПОИСКА ЗАДАНИЙ
-    async fetchMicroworkersTasks() {
-        const platform = this.platforms.microworkers;
-        
-        this.logger.info('[🔍] Используем улучшенный поиск заданий с антипалево защитой...');
-        
-        try {
-            // ✅ СНАЧАЛА ПРОБУЕМ НОВЫЙ TaskFinderFix
-            this.logger.info('[🔍] Вызываем TaskFinderFix...');
-console.log('TaskFinderFix exists:', !!this.taskFinder);
-            const tasks = await this.taskFinder.findAvailableTasks();
-            this.logger.info(`[🔍] TaskFinderFix вернул: ${tasks ? tasks.length : 'null'} заданий`);
-console.log('TaskFinderFix result:', tasks);
-            
-            if (tasks && tasks.length > 0) {
-                this.logger.success(`[✓] TaskFinderFix нашел ${tasks.length} заданий`);
-                this.metrics.antiDetectionEnabled = true;
-                return tasks; // Уже нормализованы
-            }
+   async fetchMicroworkersTasks() {
+    this.logger.info('[🔍] ВЫЗОВ НОВОГО TaskFinderFix с отладкой...');
+    
+    try {
+        const tasks = await this.taskFinder.findAvailableTasks();
+        this.logger.info(`[✓] TaskFinderFix результат: ${tasks ? tasks.length : 'null'} заданий`);
+        return tasks || [];
+    } catch (error) {
+        this.logger.error(`[✗] TaskFinderFix ошибка: ${error.message}`);
+        return [];
+    }
+}
             
             this.logger.info('[--] TaskFinderFix не нашел заданий, пробуем legacy методы...');
             
