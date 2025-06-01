@@ -18,7 +18,7 @@ class TaskFinderFix {
         // Multi-Source Configuration with DEBUG
         this.sources = {
             microworkers: {
-                enabled: true,
+                enabled: false,
                 priority: 1,
                 endpoints: [
                     // ✅ НОВЫЕ 2025 ЭНДПОИНТЫ
