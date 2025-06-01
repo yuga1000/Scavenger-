@@ -152,7 +152,7 @@ class TaskFinderFix {
                 taskAnalysis: `Analyze this task for automation potential and profitability:
 Title: {title}
 Description: {description}
-Payment: ${reward}
+Payment: {reward}
 Time: {estimatedTime} minutes
 
 Rate on scales 1-10:
