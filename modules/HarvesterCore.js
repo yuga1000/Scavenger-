@@ -569,7 +569,11 @@ class HarvesterCore {
         
         try {
             // ✅ СНАЧАЛА ПРОБУЕМ НОВЫЙ TaskFinderFix
+            this.logger.info('[🔍] Вызываем TaskFinderFix...');
+console.log('TaskFinderFix exists:', !!this.taskFinder);
             const tasks = await this.taskFinder.findAvailableTasks();
+            this.logger.info(`[🔍] TaskFinderFix вернул: ${tasks ? tasks.length : 'null'} заданий`);
+console.log('TaskFinderFix result:', tasks);
             
             if (tasks && tasks.length > 0) {
                 this.logger.success(`[✓] TaskFinderFix нашел ${tasks.length} заданий`);
