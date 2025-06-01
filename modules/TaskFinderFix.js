@@ -40,51 +40,59 @@ class TaskFinderFix {
         this.logger.info('[🔍] TaskFinderFix с антипалево защитой загружен');
     }
 
-    // ИСПРАВЛЕННЫЙ МЕТОД ПОИСКА ЗАДАНИЙ
-    async findAvailableTasks() {
-        try {
-            // Проверка антипалево лимитов
-            if (!this.canMakeRequest()) {
-                const waitTime = this.getWaitTime();
-                this.logger.info(`[🛡️] Антипалево: ждем ${Math.round(waitTime/60000)} минут`);
-                return [];
-            }
-
-            this.logger.info('[🔍] Поиск заданий с исправленными эндпоинтами...');
-            
-            // Пробуем несколько стратегий поиска
-            const strategies = [
-                () => this.searchWorkerCampaigns(),      // Кампании для работников
-                () => this.searchBasicCampaigns(),       // Базовые кампании
-                () => this.searchPublicTasks(),          // Публичные задания
-                () => this.fallbackWebScraping()        // Фоллбек на скрейпинг
-            ];
-            
-            for (const strategy of strategies) {
-                try {
-                    const tasks = await strategy();
-                    if (tasks && tasks.length > 0) {
-                        this.updateRequestStats(tasks.length);
-                        return tasks;
-                    }
-                } catch (error) {
-                    this.logger.warn(`[--] Стратегия не сработала: ${error.message}`);
-                }
-                
-                // Антипалево задержка между стратегиями
-                await this.antiDetectionDelay(5000, 15000);
-            }
-            
-            this.updateRequestStats(0);
-            return [];
-            
-        } catch (error) {
-            this.logger.error(`[✗] Ошибка поиска заданий: ${error.message}`);
-            this.updateRequestStats(0, true);
+async findAvailableTasks() {
+    try {
+        this.logger.info('[🔍] Starting task search with anti-detection...');
+        
+        // Проверка антипалево лимитов
+        if (!this.canMakeRequest()) {
+            const waitTime = this.getWaitTime();
+            this.logger.info(`[🛡️] Антипалево: ждем ${Math.round(waitTime/60000)} минут`);
             return [];
         }
-    }
 
+        this.logger.info('[🔍] Поиск заданий с исправленными эндпоинтами...');
+        
+        // Пробуем несколько стратегий поиска
+        const strategies = [
+            () => this.searchWorkerCampaigns(),      // Кампании для работников
+            () => this.searchBasicCampaigns(),       // Базовые кампании
+            () => this.searchPublicTasks(),          // Публичные задания
+            () => this.fallbackWebScraping()        // Фоллбек на скрейпинг
+        ];
+        
+        for (let i = 0; i < strategies.length; i++) {
+            try {
+                this.logger.info(`[🔍] Пробуем стратегию ${i+1}...`);
+                const tasks = await strategies[i]();
+                this.logger.info(`[🔍] Стратегия ${i+1} результат: ${tasks ? tasks.length : 0} заданий`);
+                
+                if (tasks && tasks.length > 0) {
+                    this.logger.success(`[✓] Найдено ${tasks.length} заданий через стратегию ${i+1}`);
+                    this.updateRequestStats(tasks.length);
+                    return tasks;
+                } else {
+                    this.logger.warn(`[--] Стратегия ${i+1} не дала результатов`);
+                }
+            } catch (error) {
+                this.logger.error(`[✗] Стратегия ${i+1} ошибка: ${error.message}`);
+            }
+            
+            // Антипалево задержка между стратегиями
+            this.logger.debug('[⏱️] Антипалево задержка между стратегиями...');
+            await this.antiDetectionDelay(5000, 15000);
+        }
+        
+        this.logger.warn('[❌] Все стратегии исчерпаны, заданий не найдено');
+        this.updateRequestStats(0);
+        return [];
+        
+    } catch (error) {
+        this.logger.error(`[✗] Критическая ошибка поиска заданий: ${error.message}`);
+        this.updateRequestStats(0, true);
+        return [];
+    }
+}
     // ПОИСК КАМПАНИЙ ДЛЯ РАБОТНИКОВ (ИСПРАВЛЕННЫЙ)
     async searchWorkerCampaigns() {
         this.logger.info('[📋] Поиск worker campaigns...');
