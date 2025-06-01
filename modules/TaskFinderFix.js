@@ -30,12 +30,12 @@ class TaskFinderFix {
                 ],
                 baseUrl: 'https://ttv.microworkers.com/api/v2',
                 authMethods: [
-                    (key) => ({ 'X-API-Key': key }),
-                    (key) => ({ 'Authorization': `Bearer ${key}` }),
-                    (key) => ({ 'MW-API-Key': key }),
-                    (key) => ({ 'API-Secret': key }),
-                    (key) => ({ 'X-MW-Token': key })
-                ],
+    (key) => ({ 'MicroworkersApiKey': key }), // ✅ ПРАВИЛЬНЫЙ
+    (key) => ({ 'X-API-Key': key }),
+    (key) => ({ 'Authorization': `Bearer ${key}` }),
+    (key) => ({ 'MW-API-Key': key }),
+    (key) => ({ 'API-Secret': key })
+]
                 webScraping: {
                     url: 'https://microworkers.com/jobs',
                     selectors: [
